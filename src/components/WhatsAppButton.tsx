@@ -9,13 +9,10 @@ export const WhatsAppButton = () => {
   return (
     <Button
       onClick={handleClick}
-      className="fixed bottom-6 left-6 h-auto py-3 px-4 rounded-full shadow-[var(--shadow-elegant)] bg-[#25D366] hover:bg-[#20BA59] text-white font-medium flex items-center gap-2 z-50"
+      className="fixed bottom-6 right-6 h-12 w-12 rounded-full shadow-lg bg-[#25D366] hover:bg-[#20BA59] text-white p-0 flex items-center justify-center z-50 transition-transform hover:scale-110"
+      title="Conversar sobre melhorias no AdvAI"
     >
       <MessageCircle className="h-5 w-5" />
-      <span className="hidden sm:inline text-sm">
-        Gostaria de conversar sobre melhorias no AdvAI
-      </span>
-      <span className="sm:hidden text-sm">Melhorias AdvAI</span>
     </Button>
   );
 };
