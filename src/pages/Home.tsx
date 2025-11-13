@@ -2,12 +2,17 @@ import { Header } from "@/components/Header";
 import { Card, CardContent } from "@/components/ui/card";
 import { MessageCircle, LayoutDashboard, Headphones } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Home = () => {
+  const { profile } = useAuth();
+  const chatHref = profile?.chat_link_base || "/chat";
+  const isExternalChatLink = chatHref.startsWith("http");
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
-      
+
       <main className="flex-1 flex flex-col">
         <div className="border-b border-border bg-gradient-to-r from-background to-soft-gray">
           <div className="container mx-auto px-4 py-6">
@@ -24,24 +29,40 @@ const Home = () => {
           <div className="w-full max-w-4xl">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Chat Button */}
-              <a
-                href="https://www.monitora.chat/shared/SKSA4Y"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block"
-              >
-                <Card className="h-full hover:shadow-[var(--shadow-elegant)] transition-all duration-300 hover:scale-105 border-primary/20 cursor-pointer">
-                  <CardContent className="flex flex-col items-center justify-center p-8 text-center min-h-[240px]">
-                    <div className="h-16 w-16 rounded-full bg-gradient-to-br from-primary to-[hsl(45_100%_60%)] flex items-center justify-center mb-4">
-                      <MessageCircle className="h-8 w-8 text-primary-foreground" />
-                    </div>
-                    <h2 className="text-2xl font-bold text-foreground mb-2">Chat</h2>
-                    <p className="text-sm text-muted-foreground">
-                      Converse com o assistente jurídico inteligente
-                    </p>
-                  </CardContent>
-                </Card>
-              </a>
+              {isExternalChatLink ? (
+                <a
+                  href={chatHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block"
+                >
+                  <Card className="h-full hover:shadow-[var(--shadow-elegant)] transition-all duration-300 hover:scale-105 border-primary/20 cursor-pointer">
+                    <CardContent className="flex flex-col items-center justify-center p-8 text-center min-h-[240px]">
+                      <div className="h-16 w-16 rounded-full bg-gradient-to-br from-primary to-[hsl(45_100%_60%)] flex items-center justify-center mb-4">
+                        <MessageCircle className="h-8 w-8 text-primary-foreground" />
+                      </div>
+                      <h2 className="text-2xl font-bold text-foreground mb-2">Chat</h2>
+                      <p className="text-sm text-muted-foreground">
+                        Converse com o assistente jurídico inteligente
+                      </p>
+                    </CardContent>
+                  </Card>
+                </a>
+              ) : (
+                <Link to={chatHref} className="block">
+                  <Card className="h-full hover:shadow-[var(--shadow-elegant)] transition-all duration-300 hover:scale-105 border-primary/20 cursor-pointer">
+                    <CardContent className="flex flex-col items-center justify-center p-8 text-center min-h-[240px]">
+                      <div className="h-16 w-16 rounded-full bg-gradient-to-br from-primary to-[hsl(45_100%_60%)] flex items-center justify-center mb-4">
+                        <MessageCircle className="h-8 w-8 text-primary-foreground" />
+                      </div>
+                      <h2 className="text-2xl font-bold text-foreground mb-2">Chat</h2>
+                      <p className="text-sm text-muted-foreground">
+                        Converse com o assistente jurídico inteligente
+                      </p>
+                    </CardContent>
+                  </Card>
+                </Link>
+              )}
 
               {/* CRM Button */}
               <Link to="/crm" className="block">

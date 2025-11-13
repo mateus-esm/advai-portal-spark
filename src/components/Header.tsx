@@ -1,7 +1,12 @@
 import { Link } from "react-router-dom";
 import logo from "@/assets/solo-ventures-logo.png";
+import { useAuth } from "@/contexts/AuthContext";
 
 export const Header = () => {
+  const { profile } = useAuth();
+  const chatHref = profile?.chat_link_base || "/chat";
+  const isExternalChatLink = chatHref.startsWith("http");
+
   return (
     <header className="border-b border-border bg-background sticky top-0 z-50">
       <div className="container mx-auto px-4 h-16 flex items-center justify-between">
@@ -9,22 +14,31 @@ export const Header = () => {
           <img src={logo} alt="Solo Ventures" className="h-8" />
         </Link>
         <nav className="flex items-center gap-4">
-          <Link 
-            to="/home" 
+          <Link
+            to="/home"
             className="text-sm font-medium text-foreground hover:text-primary transition-colors"
           >
             Início
           </Link>
-          <a 
-            href="https://www.monitora.chat/shared/SKSA4Y"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm font-medium text-foreground hover:text-primary transition-colors"
-          >
-            Chat
-          </a>
-          <Link 
-            to="/crm" 
+          {isExternalChatLink ? (
+            <a
+              href={chatHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm font-medium text-foreground hover:text-primary transition-colors"
+            >
+              Chat
+            </a>
+          ) : (
+            <Link
+              to={chatHref}
+              className="text-sm font-medium text-foreground hover:text-primary transition-colors"
+            >
+              Chat
+            </Link>
+          )}
+          <Link
+            to="/crm"
             className="text-sm font-medium text-foreground hover:text-primary transition-colors"
           >
             CRM
