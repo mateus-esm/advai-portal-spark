@@ -68,7 +68,14 @@ serve(async (req) => {
     });
 
     if (!leadsResponse.ok) {
-      throw new Error(`Failed to fetch Jestor data: ${leadsResponse.status}`);
+      const errorText = await leadsResponse.text();
+      console.error('Jestor API Error:', {
+        status: leadsResponse.status,
+        statusText: leadsResponse.statusText,
+        body: errorText,
+        object_type: 'o_apnte00i6bwtdfd2rjc'
+      });
+      throw new Error(`Failed to fetch Jestor data: ${leadsResponse.status} - ${errorText}`);
     }
 
     const leadsData = await leadsResponse.json();
