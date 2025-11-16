@@ -14,11 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      consumo_creditos: {
+        Row: {
+          created_at: string | null
+          creditos_utilizados: number
+          data_consumo: string | null
+          equipe_id: string
+          id: string
+          metadata: Json | null
+          periodo: string
+        }
+        Insert: {
+          created_at?: string | null
+          creditos_utilizados: number
+          data_consumo?: string | null
+          equipe_id: string
+          id?: string
+          metadata?: Json | null
+          periodo: string
+        }
+        Update: {
+          created_at?: string | null
+          creditos_utilizados?: number
+          data_consumo?: string | null
+          equipe_id?: string
+          id?: string
+          metadata?: Json | null
+          periodo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consumo_creditos_equipe_id_fkey"
+            columns: ["equipe_id"]
+            isOneToOne: false
+            referencedRelation: "equipes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       equipes: {
         Row: {
           created_at: string
           crm_link: string
+          gpt_maker_agent_id: string | null
           id: string
+          jestor_api_token: string | null
           nome_cliente: string
           suporte_link: string
           updated_at: string
@@ -26,7 +66,9 @@ export type Database = {
         Insert: {
           created_at?: string
           crm_link: string
+          gpt_maker_agent_id?: string | null
           id?: string
+          jestor_api_token?: string | null
           nome_cliente: string
           suporte_link: string
           updated_at?: string
@@ -34,12 +76,58 @@ export type Database = {
         Update: {
           created_at?: string
           crm_link?: string
+          gpt_maker_agent_id?: string | null
           id?: string
+          jestor_api_token?: string | null
           nome_cliente?: string
           suporte_link?: string
           updated_at?: string
         }
         Relationships: []
+      }
+      kpis_dashboard: {
+        Row: {
+          created_at: string | null
+          equipe_id: string
+          id: string
+          leads_atendidos: number | null
+          negocios_fechados: number | null
+          periodo: string
+          reunioes_agendadas: number | null
+          updated_at: string | null
+          valor_total_negocios: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          equipe_id: string
+          id?: string
+          leads_atendidos?: number | null
+          negocios_fechados?: number | null
+          periodo: string
+          reunioes_agendadas?: number | null
+          updated_at?: string | null
+          valor_total_negocios?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          equipe_id?: string
+          id?: string
+          leads_atendidos?: number | null
+          negocios_fechados?: number | null
+          periodo?: string
+          reunioes_agendadas?: number | null
+          updated_at?: string | null
+          valor_total_negocios?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "kpis_dashboard_equipe_id_fkey"
+            columns: ["equipe_id"]
+            isOneToOne: false
+            referencedRelation: "equipes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
