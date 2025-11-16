@@ -14,6 +14,7 @@ import CRM from "./pages/CRM";
 import Suporte from "./pages/Suporte";
 import Dashboard from "./pages/Dashboard";
 import Billing from "./pages/Billing";
+import Tutorial from "./pages/Tutorial";
 import NotFound from "./pages/NotFound";
 import { WhatsAppButton } from "./components/WhatsAppButton";
 
@@ -107,6 +108,16 @@ const App = () => (
                 <ProtectedRoute>
                   <AuthenticatedLayout>
                     <Suporte />
+                  </AuthenticatedLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/tutorial"
+              element={
+                <ProtectedRoute>
+                  <AuthenticatedLayout>
+                    <Tutorial />
                   </AuthenticatedLayout>
                 </ProtectedRoute>
               }

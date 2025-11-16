@@ -3,7 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { Zap, TrendingUp, Loader2, RefreshCcw } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Zap, TrendingUp, Loader2, RefreshCcw, ExternalLink, MessageCircle, CreditCard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface CreditData {
@@ -12,29 +13,69 @@ interface CreditData {
   periodo: string;
 }
 
+interface Plano {
+  id: number;
+  nome: string;
+  preco_mensal: number;
+  limite_creditos: number;
+  limite_usuarios: number | null;
+  funcionalidades: string[];
+}
+
 const Billing = () => {
   const [creditData, setCreditData] = useState<CreditData | null>(null);
+  const [plano, setPlano] = useState<Plano | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   const fetchCredits = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.functions.invoke('fetch-gpt-credits');
+      
+      // Fetch credit data
+      const { data: creditResponse, error: creditError } = await supabase.functions.invoke('fetch-gpt-credits');
+      if (creditError) throw creditError;
+      setCreditData(creditResponse);
 
-      if (error) throw error;
+      // Fetch user's team plan
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
 
-      setCreditData(data);
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('equipe_id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (profile?.equipe_id) {
+        const { data: equipe } = await supabase
+          .from('equipes')
+          .select('plano_id, planos(*)')
+          .eq('id', profile.equipe_id)
+          .single();
+
+        if (equipe?.planos) {
+          setPlano(equipe.planos as unknown as Plano);
+        }
+      }
     } catch (error: any) {
-      console.error('Error fetching credits:', error);
+      console.error('Error fetching billing data:', error);
       toast({
-        title: "Erro ao carregar créditos",
+        title: "Erro ao carregar dados",
         description: error.message || "Não foi possível carregar os dados de billing",
         variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRecharge = () => {
+    // Option A: WhatsApp (simple)
+    window.open('https://wa.me/5511999999999?text=Olá! Gostaria de recarregar meus créditos AdvAI', '_blank');
+    
+    // Option B: Stripe (requires setup)
+    // Will be implemented when user decides to integrate Stripe
   };
 
   useEffect(() => {
@@ -66,6 +107,54 @@ const Billing = () => {
       </div>
 
       <div className="flex-1 container mx-auto px-4 py-6 space-y-6">
+        {/* Current Plan Card */}
+        {plano && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Plano Atual</CardTitle>
+                  <CardDescription>Detalhes da sua assinatura</CardDescription>
+                </div>
+                <Badge variant="secondary" className="text-lg px-4 py-1">
+                  {plano.nome}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Valor Mensal</p>
+                  <p className="text-2xl font-bold">
+                    R$ {plano.preco_mensal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Limite de Créditos</p>
+                  <p className="text-2xl font-bold">{plano.limite_creditos.toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Usuários</p>
+                  <p className="text-2xl font-bold">
+                    {plano.limite_usuarios ? plano.limite_usuarios : 'Ilimitado'}
+                  </p>
+                </div>
+              </div>
+              <div className="border-t pt-4">
+                <p className="text-sm font-semibold mb-2">Funcionalidades Incluídas:</p>
+                <ul className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {plano.funcionalidades.map((func, index) => (
+                    <li key={index} className="text-sm text-muted-foreground flex items-center gap-2">
+                      <span className="text-primary">✓</span>
+                      {func}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Credit Overview */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
@@ -143,6 +232,29 @@ const Billing = () => {
           </CardContent>
         </Card>
 
+        {/* Recharge Options */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Recarregar Créditos</CardTitle>
+            <CardDescription>Adicione créditos extras além do seu plano mensal</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Button onClick={handleRecharge} className="flex-1" size="lg">
+                <MessageCircle className="h-5 w-5 mr-2" />
+                Recarregar via WhatsApp
+              </Button>
+              <Button variant="outline" className="flex-1" size="lg" disabled>
+                <CreditCard className="h-5 w-5 mr-2" />
+                Pagamento Online (Em breve)
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-4">
+              💡 Dica: Entre em contato conosco para pacotes personalizados de créditos
+            </p>
+          </CardContent>
+        </Card>
+
         {/* Warning for low credits */}
         {usagePercentage > 80 && (
           <Card className="border-yellow-500 bg-yellow-50 dark:bg-yellow-950">
@@ -152,7 +264,7 @@ const Billing = () => {
               </CardTitle>
               <CardDescription className="text-yellow-700 dark:text-yellow-300">
                 Você já utilizou {usagePercentage.toFixed(0)}% dos seus créditos mensais.
-                Entre em contato com o suporte para adicionar mais créditos.
+                Clique em "Recarregar Créditos" acima para adicionar mais.
               </CardDescription>
             </CardHeader>
           </Card>

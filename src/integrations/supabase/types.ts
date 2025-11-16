@@ -59,9 +59,12 @@ export type Database = {
           gpt_maker_agent_id: string | null
           id: string
           jestor_api_token: string | null
+          limite_creditos: number | null
           nome_cliente: string
+          plano_id: number | null
           suporte_link: string
           updated_at: string
+          workspace_id: string | null
         }
         Insert: {
           created_at?: string
@@ -69,9 +72,12 @@ export type Database = {
           gpt_maker_agent_id?: string | null
           id?: string
           jestor_api_token?: string | null
+          limite_creditos?: number | null
           nome_cliente: string
+          plano_id?: number | null
           suporte_link: string
           updated_at?: string
+          workspace_id?: string | null
         }
         Update: {
           created_at?: string
@@ -79,11 +85,22 @@ export type Database = {
           gpt_maker_agent_id?: string | null
           id?: string
           jestor_api_token?: string | null
+          limite_creditos?: number | null
           nome_cliente?: string
+          plano_id?: number | null
           suporte_link?: string
           updated_at?: string
+          workspace_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_equipes_plano"
+            columns: ["plano_id"]
+            isOneToOne: false
+            referencedRelation: "planos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       kpis_dashboard: {
         Row: {
@@ -128,6 +145,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      planos: {
+        Row: {
+          created_at: string | null
+          funcionalidades: string[] | null
+          id: number
+          limite_creditos: number
+          limite_usuarios: number | null
+          nome: string
+          preco_mensal: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          funcionalidades?: string[] | null
+          id: number
+          limite_creditos: number
+          limite_usuarios?: number | null
+          nome: string
+          preco_mensal: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          funcionalidades?: string[] | null
+          id?: number
+          limite_creditos?: number
+          limite_usuarios?: number | null
+          nome?: string
+          preco_mensal?: number
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       profiles: {
         Row: {

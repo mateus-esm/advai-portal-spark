@@ -25,7 +25,6 @@ serve(async (req) => {
       throw new Error('Unauthorized');
     }
 
-    // Get user's team
     const { data: profile } = await supabaseClient
       .from('profiles')
       .select('equipe_id')
@@ -50,14 +49,11 @@ serve(async (req) => {
     }
 
     const jestorToken = equipe.jestor_api_token;
-
-    // Get current month for filtering
     const now = new Date();
-    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
     const periodo = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`;
 
-    // Fetch leads data from Jestor
-    // Note: Adjust the object_type and field names according to your Jestor configuration
     const leadsResponse = await fetch('https://api.jestor.com/api/object/list', {
       method: 'POST',
       headers: {
@@ -65,65 +61,55 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        object_type: 'leads', // Adjust this to your Jestor table name
-        filters: [
-          {
-            field: 'created_at',
-            operator: '>=',
-            value: firstDayOfMonth.toISOString(),
-          }
-        ],
+        object_type: 'o_apnte00i6bwtdfd2rjc',
+        fields: ['*'],
+        limit: 10000
       }),
     });
 
     if (!leadsResponse.ok) {
-      const errorText = await leadsResponse.text();
-      console.error('Jestor API error:', leadsResponse.status, errorText);
       throw new Error(`Failed to fetch Jestor data: ${leadsResponse.status}`);
     }
 
     const leadsData = await leadsResponse.json();
-
-    // Calculate KPIs from the data
-    // Adjust these calculations based on your actual Jestor data structure
     const leads = leadsData.data || [];
-    const leadsAtendidos = leads.length;
-    const reunioesAgendadas = leads.filter((lead: any) => lead.status === 'reuniao_agendada').length;
-    const negociosFechados = leads.filter((lead: any) => lead.status === 'negocio_fechado').length;
-    const valorTotalNegocios = leads
-      .filter((lead: any) => lead.status === 'negocio_fechado')
-      .reduce((sum: number, lead: any) => sum + (parseFloat(lead.valor) || 0), 0);
+    
+    const currentMonthLeads = leads.filter((lead: any) => {
+      if (!lead.criado_em) return false;
+      const createdDate = new Date(lead.criado_em);
+      return createdDate >= firstDay && createdDate <= lastDay;
+    });
+    
+    const leadsAtendidos = currentMonthLeads.length;
+    const reunioesAgendadas = currentMonthLeads.filter((lead: any) => 
+      lead.status === 'Agendada' || lead.status === 'agendada'
+    ).length;
+    const negociosFechados = currentMonthLeads.filter((lead: any) => 
+      lead.status === 'Fechado' || lead.status === 'fechado'
+    ).length;
+    const valorTotalNegocios = currentMonthLeads
+      .filter((lead: any) => lead.status === 'Fechado' || lead.status === 'fechado')
+      .reduce((sum: number, lead: any) => sum + (parseFloat(lead.valor_da_proposta) || 0), 0);
 
-    // Store KPIs in database
-    await supabaseClient
-      .from('kpis_dashboard')
-      .upsert({
-        equipe_id: profile.equipe_id,
-        leads_atendidos: leadsAtendidos,
-        reunioes_agendadas: reunioesAgendadas,
-        negocios_fechados: negociosFechados,
-        valor_total_negocios: valorTotalNegocios,
-        periodo: periodo,
-      }, {
-        onConflict: 'equipe_id,periodo',
-        ignoreDuplicates: false,
-      });
+    const taxaConversaoReuniao = leadsAtendidos > 0 ? ((reunioesAgendadas / leadsAtendidos) * 100).toFixed(1) : '0.0';
+    const taxaConversaoNegocio = reunioesAgendadas > 0 ? ((negociosFechados / reunioesAgendadas) * 100).toFixed(1) : '0.0';
 
-    return new Response(
-      JSON.stringify({
-        leadsAtendidos,
-        reunioesAgendadas,
-        negociosFechados,
-        valorTotalNegocios,
-        taxaConversaoReuniao: leadsAtendidos > 0 ? ((reunioesAgendadas / leadsAtendidos) * 100).toFixed(1) : 0,
-        taxaConversaoNegocio: reunioesAgendadas > 0 ? ((negociosFechados / reunioesAgendadas) * 100).toFixed(1) : 0,
-        periodo,
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    await supabaseClient.from('kpis_dashboard').upsert({
+      equipe_id: profile.equipe_id,
+      leads_atendidos: leadsAtendidos,
+      reunioes_agendadas: reunioesAgendadas,
+      negocios_fechados: negociosFechados,
+      valor_total_negocios: valorTotalNegocios,
+      periodo: periodo,
+    }, { onConflict: 'equipe_id,periodo', ignoreDuplicates: false });
+
+    return new Response(JSON.stringify({
+      leadsAtendidos, reunioesAgendadas, negociosFechados, valorTotalNegocios,
+      taxaConversaoReuniao, taxaConversaoNegocio, periodo
+    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error) {
-    console.error('Error in fetch-jestor-kpis:', error);
+    console.error('Error:', error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
