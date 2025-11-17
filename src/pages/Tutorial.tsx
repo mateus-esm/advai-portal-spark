@@ -70,11 +70,10 @@ const Tutorial = () => {
           <CardContent>
             <Accordion type="single" collapsible className="w-full">
               <AccordionItem value="item-1">
-                <AccordionTrigger>Como funciona o sistema de créditos?</AccordionTrigger>
+                <AccordionTrigger>Como funciona o Chat e o Multi-atendimento?</AccordionTrigger>
                 <AccordionContent>
                   <p className="text-sm text-muted-foreground">
-                    Cada interação com o AdvAI consome créditos GPT. O consumo varia conforme a complexidade da consulta.
-                    Você pode acompanhar seu uso na página de Billing e seu saldo é renovado mensalmente de acordo com seu plano.
+                    Acesse o chat para acompanhar os atendimentos do agente em tempo real. Você pode intervir, entrar na conversa, parar o atendimento, assumir ou transferir. O chat também funciona como um canal de multi-atendimento onde os membros da equipe podem interagir com o Agente.
                   </p>
                 </AccordionContent>
               </AccordionItem>

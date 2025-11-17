@@ -1,4 +1,3 @@
-import { Header } from "@/components/Header";
 import { Card, CardContent } from "@/components/ui/card";
 import { MessageCircle, LayoutDashboard, Headphones } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -10,20 +9,17 @@ const Home = () => {
   const isExternalChatLink = chatHref.startsWith("http");
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <Header />
-
-      <main className="flex-1 flex flex-col">
-        <div className="border-b border-border bg-gradient-to-r from-background to-soft-gray">
-          <div className="container mx-auto px-4 py-6">
-            <h1 className="text-3xl font-bold text-foreground text-center">
-              AdvAI <span className="text-primary">— Assistente Jurídico</span>
-            </h1>
-            <p className="text-sm text-muted-foreground mt-2 text-center">
-              Dr. Walter Inglez • Powered by Solo Ventures ⚡
-            </p>
-          </div>
+    <div className="flex-1 flex flex-col bg-background">
+      <div className="border-b border-border bg-gradient-to-r from-background to-soft-gray">
+        <div className="container mx-auto px-4 py-6">
+          <h1 className="text-3xl font-bold text-foreground text-center">
+            AdvAI <span className="text-primary">— {equipe?.nome_cliente || 'Assistente'}</span>
+          </h1>
+          <p className="text-sm text-muted-foreground mt-2 text-center">
+            {profile?.nome_completo} • Powered by Solo Ventures ⚡
+          </p>
         </div>
+      </div>
 
         {/* Explicação Dinâmica */}
         {equipe?.home_explanation && (
@@ -111,13 +107,7 @@ const Home = () => {
             </div>
           </div>
         </div>
-      </main>
-
-      <footer className="border-t border-border bg-background">
-        <div className="container mx-auto px-4 py-4 text-center text-sm text-muted-foreground">
-          © 2025 Solo Ventures — Powering Intelligent Operations ⚡
-        </div>
-      </footer>
+      </div>
     </div>
   );
 };
