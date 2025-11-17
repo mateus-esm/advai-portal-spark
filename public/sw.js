@@ -1,5 +1,5 @@
 // Service Worker for AdvAI Portal PWA
-const CACHE_NAME = 'advai-portal-v5';
+const CACHE_NAME = 'advai-portal-v6';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -10,10 +10,26 @@ const urlsToCache = [
 
 // Install event - cache resources
 self.addEventListener('install', (event) => {
+  console.log('[SW] Installing new service worker...');
   event.waitUntil(
-    caches.open(CACHE_NAME)
+    caches.keys()
+      .then((cacheNames) => {
+        // Delete ALL old caches immediately
+        return Promise.all(
+          cacheNames.map((cacheName) => {
+            if (cacheName !== CACHE_NAME) {
+              console.log('[SW] Deleting old cache:', cacheName);
+              return caches.delete(cacheName);
+            }
+          })
+        );
+      })
+      .then(() => caches.open(CACHE_NAME))
       .then((cache) => cache.addAll(urlsToCache))
-      .then(() => self.skipWaiting())
+      .then(() => {
+        console.log('[SW] New service worker installed, skipping waiting...');
+        return self.skipWaiting();
+      })
   );
 });
 
@@ -43,15 +59,31 @@ self.addEventListener('fetch', (event) => {
 
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
+  console.log('[SW] Activating new service worker...');
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    }).then(() => self.clients.claim())
+    caches.keys()
+      .then((cacheNames) => {
+        return Promise.all(
+          cacheNames.map((cacheName) => {
+            if (cacheName !== CACHE_NAME) {
+              console.log('[SW] Removing old cache:', cacheName);
+              return caches.delete(cacheName);
+            }
+          })
+        );
+      })
+      .then(() => {
+        console.log('[SW] Taking control of all clients...');
+        return self.clients.claim();
+      })
+      .then(() => {
+        // Force refresh all clients
+        return self.clients.matchAll().then((clients) => {
+          clients.forEach((client) => {
+            console.log('[SW] Reloading client:', client.url);
+            client.postMessage({ type: 'CACHE_UPDATED' });
+          });
+        });
+      })
   );
 });
