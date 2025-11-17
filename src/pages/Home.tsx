@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 
 const Home = () => {
-  const { profile } = useAuth();
+  const { profile, equipe } = useAuth();
   const chatHref = profile?.chat_link_base || "/chat";
   const isExternalChatLink = chatHref.startsWith("http");
 
@@ -24,6 +24,21 @@ const Home = () => {
             </p>
           </div>
         </div>
+
+        {/* Explicação Dinâmica */}
+        {equipe?.home_explanation && (
+          <div className="border-b border-border bg-gradient-to-r from-soft-gray to-background">
+            <div className="container mx-auto px-4 py-6">
+              <Card className="border-primary/20">
+                <CardContent className="p-6">
+                  <p className="text-center text-muted-foreground leading-relaxed">
+                    {equipe.home_explanation}
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        )}
 
         <div className="flex-1 flex items-center justify-center p-4 bg-soft-gray">
           <div className="w-full max-w-4xl">

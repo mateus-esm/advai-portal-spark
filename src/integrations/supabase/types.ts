@@ -57,6 +57,7 @@ export type Database = {
           created_at: string
           crm_link: string
           gpt_maker_agent_id: string | null
+          home_explanation: string | null
           id: string
           jestor_api_token: string | null
           limite_creditos: number | null
@@ -70,6 +71,7 @@ export type Database = {
           created_at?: string
           crm_link: string
           gpt_maker_agent_id?: string | null
+          home_explanation?: string | null
           id?: string
           jestor_api_token?: string | null
           limite_creditos?: number | null
@@ -83,6 +85,7 @@ export type Database = {
           created_at?: string
           crm_link?: string
           gpt_maker_agent_id?: string | null
+          home_explanation?: string | null
           id?: string
           jestor_api_token?: string | null
           limite_creditos?: number | null

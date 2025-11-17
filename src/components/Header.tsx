@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import logo from "@/assets/solo-ventures-logo.png";
 import { useAuth } from "@/contexts/AuthContext";
+import { ModeToggle } from "@/components/ModeToggle";
 
 export const Header = () => {
   const { profile } = useAuth();
@@ -49,6 +50,7 @@ export const Header = () => {
           >
             Suporte
           </Link>
+          <ModeToggle />
         </nav>
       </div>
     </header>
