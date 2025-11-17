@@ -54,6 +54,8 @@ export type Database = {
       }
       equipes: {
         Row: {
+          asaas_customer_id: string | null
+          asaas_subscription_id: string | null
           created_at: string
           creditos_avulsos: number
           crm_link: string
@@ -64,11 +66,14 @@ export type Database = {
           limite_creditos: number | null
           nome_cliente: string
           plano_id: number | null
+          subscription_status: string | null
           suporte_link: string
           updated_at: string
           workspace_id: string | null
         }
         Insert: {
+          asaas_customer_id?: string | null
+          asaas_subscription_id?: string | null
           created_at?: string
           creditos_avulsos?: number
           crm_link: string
@@ -79,11 +84,14 @@ export type Database = {
           limite_creditos?: number | null
           nome_cliente: string
           plano_id?: number | null
+          subscription_status?: string | null
           suporte_link: string
           updated_at?: string
           workspace_id?: string | null
         }
         Update: {
+          asaas_customer_id?: string | null
+          asaas_subscription_id?: string | null
           created_at?: string
           creditos_avulsos?: number
           crm_link?: string
@@ -94,6 +102,7 @@ export type Database = {
           limite_creditos?: number | null
           nome_cliente?: string
           plano_id?: number | null
+          subscription_status?: string | null
           suporte_link?: string
           updated_at?: string
           workspace_id?: string | null

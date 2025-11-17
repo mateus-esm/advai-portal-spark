@@ -5,7 +5,10 @@ import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
-import { Zap, TrendingUp, Loader2, RefreshCcw, ExternalLink, MessageCircle, CreditCard } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Zap, TrendingUp, Loader2, RefreshCcw, ExternalLink, MessageCircle, CreditCard, QrCode, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface CreditData {
@@ -29,6 +32,10 @@ const Billing = () => {
   const [plano, setPlano] = useState<Plano | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedCredits, setSelectedCredits] = useState<number>(1000);
+  const [paymentMethod, setPaymentMethod] = useState<"PIX" | "CREDIT_CARD">("PIX");
+  const [processing, setProcessing] = useState(false);
+  const [pixDialogOpen, setPixDialogOpen] = useState(false);
+  const [pixData, setPixData] = useState<{ qrCode: string; copyPaste: string } | null>(null);
   const { toast } = useToast();
 
   const fetchCredits = async () => {
@@ -77,6 +84,91 @@ const Billing = () => {
     const totalCost = (selectedCredits / 500) * 40;
     const message = `Olá! Gostaria de recarregar ${selectedCredits.toLocaleString()} créditos AdvAI (R$ ${totalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})`;
     window.open(`https://wa.me/5585996487923?text=${encodeURIComponent(message)}`, '_blank');
+  };
+
+  const handleBuyCredits = async () => {
+    try {
+      setProcessing(true);
+      const totalCost = (selectedCredits / 500) * 40;
+
+      const { data, error } = await supabase.functions.invoke('asaas-buy-credits', {
+        body: {
+          amount: totalCost,
+          paymentMethod: paymentMethod,
+          credits: selectedCredits,
+        },
+      });
+
+      if (error) throw error;
+
+      if (paymentMethod === "PIX" && data.pixQrCode && data.pixCopyPaste) {
+        setPixData({
+          qrCode: data.pixQrCode,
+          copyPaste: data.pixCopyPaste,
+        });
+        setPixDialogOpen(true);
+      } else if (data.invoiceUrl) {
+        window.location.href = data.invoiceUrl;
+      }
+
+      toast({
+        title: "Pagamento criado",
+        description: "Redirecionando para o checkout...",
+      });
+
+    } catch (error: any) {
+      console.error('Error buying credits:', error);
+      toast({
+        title: "Erro ao processar pagamento",
+        description: error.message || "Tente novamente mais tarde",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleUpgradePlan = async (planoId: number) => {
+    try {
+      setProcessing(true);
+
+      const { data, error } = await supabase.functions.invoke('asaas-subscribe', {
+        body: {
+          plano_id: planoId,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data.invoiceUrl) {
+        window.location.href = data.invoiceUrl;
+      }
+
+      toast({
+        title: "Assinatura criada",
+        description: "Redirecionando para o checkout...",
+      });
+
+    } catch (error: any) {
+      console.error('Error upgrading plan:', error);
+      toast({
+        title: "Erro ao processar assinatura",
+        description: error.message || "Tente novamente mais tarde",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const copyPixCode = () => {
+    if (pixData?.copyPaste) {
+      navigator.clipboard.writeText(pixData.copyPaste);
+      toast({
+        title: "Código copiado!",
+        description: "Cole no seu app bancário para pagar",
+      });
+    }
   };
 
   useEffect(() => {
@@ -233,11 +325,11 @@ const Billing = () => {
           </CardContent>
         </Card>
 
-        {/* Credit Simulator */}
+        {/* Credit Recharge with Asaas */}
         <Card>
           <CardHeader>
-            <CardTitle>Simulador de Créditos</CardTitle>
-            <CardDescription>Calcule o custo de créditos extras (R$ 40,00 a cada 500 créditos)</CardDescription>
+            <CardTitle>Recarga de Créditos</CardTitle>
+            <CardDescription>Compre créditos avulsos com Pix ou Cartão</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-4">
@@ -259,6 +351,30 @@ const Billing = () => {
               </div>
             </div>
 
+            <div className="space-y-4">
+              <Label className="text-sm font-medium">Método de Pagamento</Label>
+              <RadioGroup value={paymentMethod} onValueChange={(value) => setPaymentMethod(value as "PIX" | "CREDIT_CARD")}>
+                <div className="flex items-center space-x-2 border rounded-lg p-3 cursor-pointer hover:bg-accent">
+                  <RadioGroupItem value="PIX" id="pix" />
+                  <Label htmlFor="pix" className="flex-1 cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <QrCode className="h-4 w-4" />
+                      <span>Pix (Aprovação Instantânea)</span>
+                    </div>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2 border rounded-lg p-3 cursor-pointer hover:bg-accent">
+                  <RadioGroupItem value="CREDIT_CARD" id="card" />
+                  <Label htmlFor="card" className="flex-1 cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="h-4 w-4" />
+                      <span>Cartão de Crédito</span>
+                    </div>
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+
             <div className="border-t pt-4">
               <div className="flex items-center justify-between mb-4">
                 <span className="text-sm text-muted-foreground">Valor Total</span>
@@ -266,31 +382,42 @@ const Billing = () => {
                   R$ {((selectedCredits / 500) * 40).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </span>
               </div>
-              <Button onClick={handleRecharge} className="w-full" size="lg">
-                <MessageCircle className="h-5 w-5 mr-2" />
-                Solicitar via WhatsApp
+              <Button 
+                onClick={handleBuyCredits} 
+                className="w-full" 
+                size="lg"
+                disabled={processing}
+              >
+                {processing ? (
+                  <>
+                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                    Processando...
+                  </>
+                ) : (
+                  <>
+                    {paymentMethod === "PIX" ? <QrCode className="h-5 w-5 mr-2" /> : <CreditCard className="h-5 w-5 mr-2" />}
+                    Comprar Créditos
+                  </>
+                )}
               </Button>
               <p className="text-xs text-muted-foreground mt-3 text-center">
-                💡 A mensagem será gerada automaticamente com o valor calculado
+                🔒 Pagamento seguro via Asaas Gateway
               </p>
             </div>
           </CardContent>
         </Card>
 
-        {/* Recharge Options */}
+        {/* Alternative: WhatsApp */}
         <Card>
           <CardHeader>
-            <CardTitle>Outras Opções de Pagamento</CardTitle>
-            <CardDescription>Métodos adicionais para recarregar créditos</CardDescription>
+            <CardTitle>Atendimento Personalizado</CardTitle>
+            <CardDescription>Prefere falar com nossa equipe?</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button variant="outline" className="w-full" size="lg" disabled>
-              <CreditCard className="h-5 w-5 mr-2" />
-              Pagamento Online (Em breve)
+            <Button onClick={handleRecharge} variant="outline" className="w-full" size="lg">
+              <MessageCircle className="h-5 w-5 mr-2" />
+              Solicitar via WhatsApp
             </Button>
-            <p className="text-xs text-muted-foreground mt-4 text-center">
-              💡 Em breve você poderá fazer recarga diretamente via cartão ou PIX
-            </p>
           </CardContent>
         </Card>
 
@@ -329,12 +456,17 @@ const Billing = () => {
                 <Button 
                   variant="outline" 
                   className="w-full"
-                  onClick={() => {
-                    const message = "Olá! Gostaria de fazer upgrade para o plano Solo Starter (R$ 150/mês)";
-                    window.open(`https://wa.me/5585996487923?text=${encodeURIComponent(message)}`, '_blank');
-                  }}
+                  onClick={() => handleUpgradePlan(1)}
+                  disabled={processing}
                 >
-                  Fazer Upgrade
+                  {processing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Processando...
+                    </>
+                  ) : (
+                    "Fazer Upgrade"
+                  )}
                 </Button>
               </CardContent>
             </Card>
@@ -368,12 +500,17 @@ const Billing = () => {
                 </ul>
                 <Button 
                   className="w-full"
-                  onClick={() => {
-                    const message = "Olá! Gostaria de fazer upgrade para o plano Solo Scale (R$ 400/mês)";
-                    window.open(`https://wa.me/5585996487923?text=${encodeURIComponent(message)}`, '_blank');
-                  }}
+                  onClick={() => handleUpgradePlan(2)}
+                  disabled={processing}
                 >
-                  Fazer Upgrade
+                  {processing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Processando...
+                    </>
+                  ) : (
+                    "Fazer Upgrade"
+                  )}
                 </Button>
               </CardContent>
             </Card>
@@ -404,12 +541,17 @@ const Billing = () => {
                 <Button 
                   variant="outline"
                   className="w-full"
-                  onClick={() => {
-                    const message = "Olá! Gostaria de fazer upgrade para o plano Solo Pro (R$ 1.000/mês)";
-                    window.open(`https://wa.me/5585996487923?text=${encodeURIComponent(message)}`, '_blank');
-                  }}
+                  onClick={() => handleUpgradePlan(3)}
+                  disabled={processing}
                 >
-                  Fazer Upgrade
+                  {processing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Processando...
+                    </>
+                  ) : (
+                    "Fazer Upgrade"
+                  )}
                 </Button>
               </CardContent>
             </Card>
@@ -431,6 +573,48 @@ const Billing = () => {
           </Card>
         )}
       </div>
+
+      {/* PIX Dialog */}
+      <Dialog open={pixDialogOpen} onOpenChange={setPixDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Pagamento via PIX</DialogTitle>
+            <DialogDescription>
+              Escaneie o QR Code ou copie o código Pix para efetuar o pagamento
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {pixData?.qrCode && (
+              <div className="flex justify-center p-4 bg-white rounded-lg">
+                <img 
+                  src={`data:image/png;base64,${pixData.qrCode}`} 
+                  alt="QR Code PIX" 
+                  className="w-64 h-64"
+                />
+              </div>
+            )}
+            {pixData?.copyPaste && (
+              <div className="space-y-2">
+                <Label htmlFor="pix-code">Código PIX (Copia e Cola)</Label>
+                <div className="flex gap-2">
+                  <input
+                    id="pix-code"
+                    value={pixData.copyPaste}
+                    readOnly
+                    className="flex-1 px-3 py-2 text-sm border rounded-md bg-muted"
+                  />
+                  <Button onClick={copyPixCode} size="sm">
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+            <div className="text-xs text-muted-foreground text-center">
+              O pagamento será confirmado automaticamente após o processamento
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
