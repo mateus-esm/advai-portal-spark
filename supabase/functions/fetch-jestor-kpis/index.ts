@@ -50,9 +50,8 @@ serve(async (req) => {
     const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
     const periodo = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`;
 
-    console.log(`Buscando dados do Jestor para o período: ${periodo}`);
+    console.log(`[Jestor] Buscando dados para o período: ${periodo}`);
 
-    // URL da sua organização
     const leadsResponse = await fetch('https://mateussmaia.api.jestor.com/object/list', {
       method: 'POST',
       headers: {
@@ -68,26 +67,33 @@ serve(async (req) => {
 
     if (!leadsResponse.ok) {
       const errText = await leadsResponse.text();
-      console.error("Erro Jestor API:", errText);
+      console.error("[Jestor] Erro API:", errText);
       throw new Error(`Failed to fetch Jestor data: ${leadsResponse.status}`);
     }
 
     const leadsData = await leadsResponse.json();
-    const leads = leadsData.data || [];
+    
+    // --- DEBUG CRÍTICO: Ver o que a API retornou ---
+    console.log("[Jestor] Estrutura da resposta:", JSON.stringify(leadsData).substring(0, 500) + "..."); 
 
-    // --- DIAGNÓSTICO (IMPORTANTE) ---
-    // Isso vai imprimir no log do Supabase os Status exatos que estão vindo
-    if (leads.length > 0) {
-        const exemplos = leads.slice(0, 5).map((l: any) => ({
-            status: l.status,
-            reuniao_agendada: l.reuniao_agendada
-        }));
-        console.log("Amostra de dados (Status / Reuniao):", JSON.stringify(exemplos));
-        
-        const todosStatus = [...new Set(leads.map((l: any) => String(l.status)))];
-        console.log("LISTA DE TODOS OS STATUS ENCONTRADOS:", todosStatus);
+    // Verificação de Segurança: Garante que 'leads' seja sempre um array
+    let leads: any[] = [];
+    
+    if (Array.isArray(leadsData.data)) {
+        leads = leadsData.data;
+    } else if (leadsData.data && Array.isArray(leadsData.data.items)) {
+        // Caso a API retorne { data: { items: [...] } }
+        leads = leadsData.data.items;
+    } else if (Array.isArray(leadsData)) {
+        // Caso a API retorne direto [...]
+        leads = leadsData;
+    } else {
+        console.error("[Jestor] ERRO: 'data' não é uma lista!", leadsData);
+        // Não lança erro 500, apenas considera lista vazia para não quebrar o front
+        leads = [];
     }
-    // --------------------------------
+
+    console.log(`[Jestor] Total de registros processados: ${leads.length}`);
 
     // Filtra leads criados no mês atual
     const currentMonthLeads = leads.filter((lead: any) => {
@@ -98,18 +104,13 @@ serve(async (req) => {
 
     const leadsAtendidos = currentMonthLeads.length;
 
-    // CORREÇÃO 1: Verifica Status OU o campo específico 'reuniao_agendada'
     const reunioesAgendadas = currentMonthLeads.filter((lead: any) => {
       const s = String(lead.status || '').toLowerCase();
-      // Verifica se o campo 'reuniao_agendada' existe e é verdadeiro (ou não vazio)
       const temFlagReuniao = lead.reuniao_agendada === true || lead.reuniao_agendada === 'true' || (lead.reuniao_agendada && lead.reuniao_agendada !== 'false');
-      // Verifica o status por texto
       const statusReuniao = s.includes('agendada') || s.includes('reunião') || s === 'agendado';
-      
       return temFlagReuniao || statusReuniao;
     }).length;
 
-    // CORREÇÃO 2: Verifica Status "Fechado" de forma mais ampla
     const negociosFechados = currentMonthLeads.filter((lead: any) => {
       const s = String(lead.status || '').toLowerCase();
       return s.includes('fechado') || s.includes('ganho') || s === 'contratado' || s.includes('venda');
@@ -125,7 +126,6 @@ serve(async (req) => {
     const taxaConversaoReuniao = leadsAtendidos > 0 ? ((reunioesAgendadas / leadsAtendidos) * 100).toFixed(1) : '0.0';
     const taxaConversaoNegocio = reunioesAgendadas > 0 ? ((negociosFechados / reunioesAgendadas) * 100).toFixed(1) : '0.0';
 
-    // Atualiza o banco
     await supabaseClient.from('kpis_dashboard').upsert({
       equipe_id: profile.equipe_id,
       leads_atendidos: leadsAtendidos,
@@ -141,10 +141,11 @@ serve(async (req) => {
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error) {
-    console.error('Error:', error);
+    console.error('[Jestor] Erro Fatal:', error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }
 });
+
