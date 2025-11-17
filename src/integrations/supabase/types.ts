@@ -197,6 +197,7 @@ export type Database = {
       profiles: {
         Row: {
           chat_link_base: string
+          cpf: string | null
           created_at: string
           email: string
           equipe_id: string
@@ -207,6 +208,7 @@ export type Database = {
         }
         Insert: {
           chat_link_base: string
+          cpf?: string | null
           created_at?: string
           email: string
           equipe_id: string
@@ -217,6 +219,7 @@ export type Database = {
         }
         Update: {
           chat_link_base?: string
+          cpf?: string | null
           created_at?: string
           email?: string
           equipe_id?: string

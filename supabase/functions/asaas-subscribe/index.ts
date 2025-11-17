@@ -49,12 +49,17 @@ serve(async (req) => {
     // Get user's profile and team
     const { data: profile, error: profileError } = await supabaseClient
       .from('profiles')
-      .select('equipe_id, nome_completo, email')
+      .select('equipe_id, nome_completo, email, cpf')
       .eq('user_id', user.id)
       .single();
 
     if (profileError || !profile) {
       throw new Error('Profile not found');
+    }
+
+    // Validate CPF is present
+    if (!profile.cpf) {
+      throw new Error('CPF não cadastrado. Por favor, complete seu cadastro antes de realizar a assinatura.');
     }
 
     // Get team data
@@ -96,7 +101,7 @@ serve(async (req) => {
         body: JSON.stringify({
           name: equipe.nome_cliente,
           email: profile.email,
-          cpfCnpj: '', // Optional
+          cpfCnpj: profile.cpf,
           notificationDisabled: false,
         }),
       });
@@ -120,6 +125,27 @@ serve(async (req) => {
 
       if (updateError) {
         console.error('[Asaas Subscribe] Error updating team:', updateError);
+      }
+    } else {
+      // Customer already exists, update CPF if needed
+      console.log('[Asaas Subscribe] Updating existing customer CPF...');
+      
+      const updateCustomerResponse = await fetch(`${ASAAS_API_URL}/customers/${asaasCustomerId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'access_token': asaasApiKey,
+        },
+        body: JSON.stringify({
+          cpfCnpj: profile.cpf,
+        }),
+      });
+
+      if (!updateCustomerResponse.ok) {
+        const errorData = await updateCustomerResponse.text();
+        console.error('[Asaas Subscribe] Error updating customer CPF:', errorData);
+      } else {
+        console.log('[Asaas Subscribe] Customer CPF updated successfully');
       }
     }
 
