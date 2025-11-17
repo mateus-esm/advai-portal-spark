@@ -5,3 +5,9 @@ verify_jwt = true
 
 [functions.fetch-jestor-kpis]
 verify_jwt = true
+
+[functions.asaas-subscribe]
+verify_jwt = true
+
+[functions.asaas-buy-credits]
+verify_jwt = true
