@@ -17,6 +17,7 @@ interface Equipe {
   nome_cliente: string;
   crm_link: string;
   suporte_link: string;
+  home_explanation?: string;
 }
 
 interface AuthContextType {
