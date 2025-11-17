@@ -26,12 +26,16 @@ serve(async (req) => {
     const { data: profile } = await supabaseClient.from('profiles').select('equipe_id').eq('user_id', user.id).single();
     if (!profile) throw new Error('Profile not found');
 
-    const { data: equipe } = await supabaseClient.from('equipes').select('gpt_maker_agent_id, workspace_id').eq('id', profile.equipe_id).single();
+    // Busca o ID do agente e o LIMITE DO PLANO (se não tiver, assume 1000)
+    const { data: equipe } = await supabaseClient
+      .from('equipes')
+      .select('gpt_maker_agent_id, limite_creditos')
+      .eq('id', profile.equipe_id)
+      .single();
 
-    if (!equipe?.gpt_maker_agent_id || !equipe?.workspace_id) {
-      console.error("IDs faltando na tabela equipes:", equipe); // Log para debug
+    if (!equipe?.gpt_maker_agent_id) {
       return new Response(
-        JSON.stringify({ error: 'GPT Maker configuration incomplete' }),
+        JSON.stringify({ error: 'GPT Maker Agent ID not configured' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       );
     }
@@ -43,47 +47,47 @@ serve(async (req) => {
     const year = now.getFullYear();
     const month = now.getMonth() + 1;
 
-    // URLs confirmadas como V2
+    // Chama apenas a API de consumo (v2)
     const spentUrl = `https://api.gptmaker.ai/v2/agent/${equipe.gpt_maker_agent_id}/credits-spent?year=${year}&month=${month}`;
-    const balanceUrl = `https://api.gptmaker.ai/v2/workspace/${equipe.workspace_id}/credits`;
 
-    const [spentRes, balanceRes] = await Promise.all([
-      fetch(spentUrl, { headers: { 'Authorization': `Bearer ${gptMakerToken}`, 'Content-Type': 'application/json' } }),
-      fetch(balanceUrl, { headers: { 'Authorization': `Bearer ${gptMakerToken}`, 'Content-Type': 'application/json' } })
-    ]);
+    const spentRes = await fetch(spentUrl, { 
+      headers: { 'Authorization': `Bearer ${gptMakerToken}`, 'Content-Type': 'application/json' } 
+    });
 
     if (!spentRes.ok) {
         const err = await spentRes.text();
         console.error("Erro API Agent Spent:", err);
         throw new Error(`GPT Maker Agent API error: ${spentRes.status}`);
     }
-    if (!balanceRes.ok) {
-        const err = await balanceRes.text();
-        console.error("Erro API Workspace Credits:", err);
-        throw new Error(`GPT Maker Workspace API error: ${balanceRes.status}`);
-    }
 
     const spentData = await spentRes.json();
-    const balanceData = await balanceRes.json();
+    
+    // LOG PARA CONFERÊNCIA
+    console.log("JSON Retornado pelo GPT Maker:", spentData);
 
-    // LOGS IMPORTANTES: Veja isso no painel do Supabase se der erro
-    console.log("Resposta API Spent:", spentData);
-    console.log("Resposta API Balance:", balanceData);
+    // --- CORREÇÃO PRINCIPAL AQUI ---
+    // Lê o campo "total" do JSON que você mostrou
+    const creditsSpent = spentData.total || 0; 
+    
+    // Pega o limite do banco (ou usa 1000 como padrão)
+    const planLimit = equipe.limite_creditos || 1000;
 
-    // CORREÇÃO AQUI: balanceData.credits em vez de balanceData.balance
-    // E fallback para spentData.credits se total_credits_spent não existir
-    const creditsSpent = spentData.total_credits_spent || spentData.credits || 0;
-    const creditsBalance = balanceData.credits || balanceData.balance || 0;
+    // Calcula o saldo do cliente localmente
+    const creditsBalance = planLimit - creditsSpent;
 
     const periodo = `${year}-${month.toString().padStart(2, '0')}`;
 
+    // Salva no banco
     await supabaseClient.from('consumo_creditos').upsert({
-      equipe_id: profile.equipe_id, creditos_utilizados: creditsSpent, periodo, metadata: spentData
+      equipe_id: profile.equipe_id, 
+      creditos_utilizados: creditsSpent, 
+      periodo, 
+      metadata: spentData
     }, { onConflict: 'equipe_id,periodo', ignoreDuplicates: false });
 
     return new Response(JSON.stringify({
-      creditsSpent, 
-      creditsBalance, 
+      creditsSpent: creditsSpent,    // Agora vai mostrar o valor correto (ex: 4228)
+      creditsBalance: creditsBalance, // Saldo calculado (Limite - Gasto)
       periodo
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
