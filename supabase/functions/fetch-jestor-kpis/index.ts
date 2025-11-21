@@ -63,141 +63,83 @@ serve(async (req) => {
 
     console.log(`[Jestor] Buscando dados para o período: ${periodo}`);
 
-    // Buscar TODOS os leads com paginação usando offset
+    // Buscar TODOS os leads da tabela - sem filtros de data inicialmente
+    console.log('[Jestor] Buscando TODOS os registros da tabela o_apnte00i6bwtdfd2rjc...');
+    
+    const leadsResponse = await fetch('https://mateussmaia.api.jestor.com/object/list', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${jestorToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        object_type: 'o_apnte00i6bwtdfd2rjc',
+        fields: ['*'],
+        limit: 10000 // Limite alto para garantir que pegamos todos
+      }),
+    });
+
+    if (!leadsResponse.ok) {
+      const errText = await leadsResponse.text();
+      console.error("[Jestor] Erro API:", errText);
+      throw new Error(`Failed to fetch Jestor data: ${leadsResponse.status}`);
+    }
+
+    const leadsData = await leadsResponse.json();
+    console.log("[Jestor] Resposta da API:", JSON.stringify(leadsData).substring(0, 500));
+
     let allLeads: any[] = [];
-    let offset = 0;
-    const limit = 100;
-    let hasMore = true;
-
-    console.log('[Jestor] Iniciando busca de leads com paginação...');
-
-    while (hasMore) {
-      console.log(`[Jestor] Buscando registros com offset ${offset}, limit ${limit}...`);
-      
-      const leadsResponse = await fetch('https://mateussmaia.api.jestor.com/object/list', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${jestorToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          object_type: 'o_apnte00i6bwtdfd2rjc',
-          fields: ['*'],
-          limit: limit,
-          offset: offset
-        }),
-      });
-
-      if (!leadsResponse.ok) {
-        const errText = await leadsResponse.text();
-        console.error("[Jestor] Erro API:", errText);
-        throw new Error(`Failed to fetch Jestor data: ${leadsResponse.status}`);
-      }
-
-      const leadsData = await leadsResponse.json();
-      
-      // Log da estrutura apenas na primeira iteração
-      if (offset === 0) {
-        console.log("[Jestor] Estrutura da resposta:", JSON.stringify(leadsData).substring(0, 800));
-        
-        // Verifica se há informação de total
-        if (leadsData.data?.total) {
-          console.log(`[Jestor] Total de registros disponíveis: ${leadsData.data.total}`);
-        }
-      }
-
-      let batchLeads: any[] = [];
-      
-      if (Array.isArray(leadsData.data)) {
-        batchLeads = leadsData.data;
-      } else if (leadsData.data && Array.isArray(leadsData.data.items)) {
-        batchLeads = leadsData.data.items;
-      } else if (Array.isArray(leadsData)) {
-        batchLeads = leadsData;
-      } else {
-        console.error("[Jestor] ERRO: 'data' não é uma lista!", leadsData);
-        batchLeads = [];
-      }
-
-      console.log(`[Jestor] Offset ${offset}: ${batchLeads.length} registros recuperados`);
-
-      if (batchLeads.length === 0) {
-        hasMore = false;
-      } else {
-        allLeads = allLeads.concat(batchLeads);
-        
-        // Se retornou menos que o limit, não há mais registros
-        if (batchLeads.length < limit) {
-          hasMore = false;
-        } else {
-          offset += limit;
-        }
-      }
+    
+    if (Array.isArray(leadsData.data)) {
+      allLeads = leadsData.data;
+    } else if (leadsData.data && Array.isArray(leadsData.data.items)) {
+      allLeads = leadsData.data.items;
+    } else if (Array.isArray(leadsData)) {
+      allLeads = leadsData;
+    } else {
+      console.error("[Jestor] ERRO: Estrutura inesperada!", leadsData);
+      allLeads = [];
     }
 
     const leads = allLeads;
 
-    console.log(`[Jestor] Total de registros processados: ${leads.length}`);
+    console.log(`[Jestor] Total de TODOS os registros na tabela: ${leads.length}`);
     console.log(`[Jestor] Período de filtro: ${firstDay.toISOString()} até ${lastDay.toISOString()}`);
 
     // Filtra leads criados no mês atual
     const currentMonthLeads = leads.filter((lead: any) => {
-      if (!lead.criado_em) {
-        console.log(`[Jestor] Lead SEM data criado_em:`, { name: lead.name, id: lead.id_o_apnte00i6bwtdfd2rjc });
-        return false;
-      }
+      if (!lead.criado_em) return false;
       const createdDate = new Date(lead.criado_em);
-      const isInPeriod = createdDate >= firstDay && createdDate <= lastDay;
-      
-      if (!isInPeriod) {
-        console.log(`[Jestor] Lead FORA do período:`, { 
-          name: lead.name, 
-          criado_em: lead.criado_em, 
-          createdDate: createdDate.toISOString() 
-        });
-      } else {
-        console.log(`[Jestor] Lead NO período:`, { 
-          name: lead.name, 
-          criado_em: lead.criado_em,
-          status: lead.status,
-          reuniao_agendada: lead.reuniao_agendada
-        });
-      }
-      
-      return isInPeriod;
+      return createdDate >= firstDay && createdDate <= lastDay;
     });
 
     const leadsAtendidos = currentMonthLeads.length;
-    console.log(`[Jestor] Leads no período atual: ${leadsAtendidos}`);
+    console.log(`[Jestor] Leads no período ${periodo}: ${leadsAtendidos}`);
 
-    // APENAS reuniões com checkbox marcado como true
+    // Reuniões: APENAS onde reuniao_agendada === true
     const reunioesAgendadas = currentMonthLeads.filter((lead: any) => {
-      const isReuniao = lead.reuniao_agendada === true || lead.reuniao_agendada === 'true';
-      
-      if (isReuniao) {
-        console.log(`[Jestor] Reunião IDENTIFICADA (checkbox=true):`, {
-          name: lead.name,
-          status: lead.status,
-          reuniao_agendada: lead.reuniao_agendada
-        });
-      }
-      
-      return isReuniao;
+      return lead.reuniao_agendada === true || lead.reuniao_agendada === 'true';
     }).length;
     
-    console.log(`[Jestor] Total de reuniões agendadas: ${reunioesAgendadas}`);
+    console.log(`[Jestor] Reuniões agendadas (checkbox=true): ${reunioesAgendadas}`);
 
+    // Negócios fechados: status contém "ganho"
     const negociosFechados = currentMonthLeads.filter((lead: any) => {
-      const s = String(lead.status || '').toLowerCase();
-      return s.includes('fechado') || s.includes('ganho') || s === 'contratado' || s.includes('venda');
+      const status = String(lead.status || '').toLowerCase();
+      return status.includes('ganho');
     }).length;
 
+    console.log(`[Jestor] Negócios fechados (status Ganho): ${negociosFechados}`);
+
+    // Valor total dos negócios fechados
     const valorTotalNegocios = currentMonthLeads
       .filter((lead: any) => {
-          const s = String(lead.status || '').toLowerCase();
-          return s.includes('fechado') || s.includes('ganho') || s === 'contratado' || s.includes('venda');
+        const status = String(lead.status || '').toLowerCase();
+        return status.includes('ganho');
       })
       .reduce((sum: number, lead: any) => sum + (parseFloat(lead.valor_da_proposta) || 0), 0);
+
+    console.log(`[Jestor] Valor total dos negócios: R$ ${valorTotalNegocios}`);
 
     const taxaConversaoReuniao = leadsAtendidos > 0 ? ((reunioesAgendadas / leadsAtendidos) * 100).toFixed(1) : '0.0';
     const taxaConversaoNegocio = reunioesAgendadas > 0 ? ((negociosFechados / reunioesAgendadas) * 100).toFixed(1) : '0.0';
