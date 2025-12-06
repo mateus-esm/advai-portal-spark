@@ -56,11 +56,13 @@ serve(async (req) => {
 
     console.log(`[Monthly Credit Reset] Found ${equipes?.length || 0} teams to reset`);
 
-    // Reset credits for each team
+    // Reset credits for each team - consumption resets but creditos_avulsos are kept
     let resetCount = 0;
     for (const equipe of equipes || []) {
       try {
-        // Delete old consumption records or set to 0
+        // Create a new consumption record for the new month with 0 credits used
+        // This effectively "resets" the consumption for the new month
+        // creditos_avulsos are NOT touched - they persist across months
         const { error: upsertError } = await supabaseClient
           .from('consumo_creditos')
           .upsert({
@@ -68,7 +70,11 @@ serve(async (req) => {
             periodo: periodo,
             creditos_utilizados: 0,
             data_consumo: new Date().toISOString(),
-            metadata: { reset_type: 'monthly_automatic', reset_at: new Date().toISOString() }
+            metadata: { 
+              reset_type: 'monthly_automatic', 
+              reset_at: new Date().toISOString(),
+              note: 'Plan credits reset. Extra credits (creditos_avulsos) are preserved.'
+            }
           }, {
             onConflict: 'equipe_id,periodo'
           });
@@ -77,7 +83,7 @@ serve(async (req) => {
           console.error(`[Monthly Credit Reset] Error resetting team ${equipe.nome_cliente}:`, upsertError);
         } else {
           resetCount++;
-          console.log(`[Monthly Credit Reset] Reset successful for team: ${equipe.nome_cliente}`);
+          console.log(`[Monthly Credit Reset] Reset successful for team: ${equipe.nome_cliente} - creditos_avulsos preserved`);
         }
       } catch (error) {
         console.error(`[Monthly Credit Reset] Error processing team ${equipe.nome_cliente}:`, error);
