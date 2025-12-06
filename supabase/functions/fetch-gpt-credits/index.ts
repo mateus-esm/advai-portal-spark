@@ -91,6 +91,8 @@ serve(async (req) => {
       creditsSpent: creditsSpent,
       creditsBalance: creditsBalance,
       totalCredits: totalCredits,
+      planLimit: planLimit,
+      extraCredits: extraCredits,
       periodo
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
