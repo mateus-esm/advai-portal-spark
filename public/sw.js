@@ -1,5 +1,5 @@
 // Service Worker for AdvAI Portal PWA
-const CACHE_NAME = 'advai-portal-v13-1209';
+const CACHE_NAME = 'advai-portal-v14-dashboard-fix';
 const urlsToCache = [
   '/',
   '/index.html',
