@@ -1,4 +1,3 @@
-// supabase/functions/fetch-jestor-kpis/index.ts
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -24,133 +23,103 @@ serve(async (req) => {
 
     if (!user) throw new Error('Unauthorized');
 
-    const { data: profile } = await supabaseClient
-      .from('profiles')
-      .select('equipe_id')
-      .eq('user_id', user.id)
-      .single();
-
+    const { data: profile } = await supabaseClient.from('profiles').select('equipe_id').eq('user_id', user.id).single();
     if (!profile) throw new Error('Profile not found');
 
-    const { data: equipe } = await supabaseClient
-      .from('equipes')
-      .select('jestor_api_token')
-      .eq('id', profile.equipe_id)
-      .single();
+    const { data: equipe } = await supabaseClient.from('equipes').select('jestor_api_token').eq('id', profile.equipe_id).single();
+    if (!equipe?.jestor_api_token) throw new Error('Jestor API token not configured');
 
-    if (!equipe?.jestor_api_token) {
-      return new Response(
-        JSON.stringify({ error: 'Jestor API token not configured' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      );
-    }
-
-    const jestorToken = equipe.jestor_api_token;
+    // 1. Receber Mês/Ano do Frontend (ou usar atual)
+    let reqBody = {};
+    try { reqBody = await req.json(); } catch {}
     
-    let requestBody: any = {};
-    try {
-      requestBody = await req.json();
-    } catch { }
+    const now = new Date();
+    const targetMonth = reqBody.month ? parseInt(reqBody.month) : now.getMonth() + 1;
+    const targetYear = reqBody.year ? parseInt(reqBody.year) : now.getFullYear();
     
-    // Data alvo (filtro do dashboard)
-    const targetMonth = requestBody.month ? parseInt(requestBody.month) : new Date().getMonth() + 1;
-    const targetYear = requestBody.year ? parseInt(requestBody.year) : new Date().getFullYear();
-    
-    // Intervalo de datas para filtrar a CRIAÇÃO do lead
+    // Definir intervalo exato do mês (00:00:00 dia 1 até 23:59:59 dia 31)
     const firstDay = new Date(targetYear, targetMonth - 1, 1);
-    const lastDay = new Date(targetYear, targetMonth, 0, 23, 59, 59);
+    const lastDay = new Date(targetYear, targetMonth, 0, 23, 59, 59, 999); // Último dia do mês
     const periodo = `${targetYear}-${targetMonth.toString().padStart(2, '0')}`;
 
-    console.log(`[Jestor] Buscando dados para coorte: ${periodo}`);
+    console.log(`[Jestor] Buscando Coorte: ${periodo} (De ${firstDay.toISOString()} até ${lastDay.toISOString()})`);
 
-    // Buscar TODOS os leads (sem filtro na API para garantir que pegamos tudo e filtramos localmente)
+    // 2. Buscar TODOS os leads do Jestor (Paginação pode ser necessária se passar de 10k)
     const leadsResponse = await fetch('https://mateussmaia.api.jestor.com/object/list', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${jestorToken}`,
+        'Authorization': `Bearer ${equipe.jestor_api_token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         object_type: 'o_apnte00i6bwtdfd2rjc',
         fields: ['*'],
-        limit: 10000 
+        limit: 10000 // Limite de segurança
       }),
     });
 
-    if (!leadsResponse.ok) {
-      throw new Error(`Failed to fetch Jestor data: ${leadsResponse.status}`);
-    }
-
+    if (!leadsResponse.ok) throw new Error('Erro na API Jestor');
     const leadsData = await leadsResponse.json();
-    let allLeads: any[] = [];
     
-    if (Array.isArray(leadsData.data)) {
-      allLeads = leadsData.data;
-    } else if (leadsData.data && Array.isArray(leadsData.data.items)) {
-      allLeads = leadsData.data.items;
-    } else if (Array.isArray(leadsData)) {
-      allLeads = leadsData;
-    }
+    let allLeads: any[] = [];
+    if (Array.isArray(leadsData.data)) allLeads = leadsData.data;
+    else if (leadsData.data?.items) allLeads = leadsData.data.items;
 
-    // Função Robustez de Data (DD/MM/YYYY ou ISO)
+    // Helper robusto para datas (ISO e BR)
     const parseDate = (dateStr: any) => {
       if (!dateStr) return null;
       const str = String(dateStr).trim();
-      
-      // Tenta formato ISO direto
-      let date = new Date(str);
-      if (!isNaN(date.getTime())) return date;
-
-      // Tenta formato BR (DD/MM/YYYY)
+      // ISO (YYYY-MM-DD...)
+      if (str.includes('-')) return new Date(str);
+      // BR (DD/MM/YYYY)
       if (str.includes('/')) {
-        const parts = str.split('/'); // assumindo dia/mês/ano
-        if (parts.length === 3) {
-           // Mês no JS começa em 0
-           return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-        }
+        const [d, m, y] = str.split('/');
+        return new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
       }
       return null;
     };
 
-    // 1. FILTRAR LEADS DO PERÍODO (COORTE)
-    // Apenas leads que nasceram neste mês entram na conta
+    // 3. FILTRAGEM DE COORTE
+    // Apenas leads nascidos no mês alvo
     const leadsDaCoorte = allLeads.filter((lead: any) => {
-      const createdDate = parseDate(lead.criado_em); // usando o campo correto do seu Jestor
-      if (!createdDate) return false;
+      const createdDate = parseDate(lead.criado_em);
+      if (!createdDate || isNaN(createdDate.getTime())) return false;
       return createdDate >= firstDay && createdDate <= lastDay;
     });
 
+    // 4. CÁLCULO DE MÉTRICAS (Baseado APENAS na coorte filtrada)
     const leadsAtendidos = leadsDaCoorte.length;
-    console.log(`[Jestor] Leads criados em ${periodo}: ${leadsAtendidos}`);
 
-    // 2. CALCULAR MÉTRICAS DENTRO DA COORTE
-    // Destes leads criados no mês, quantos agendaram ou fecharam?
-    
+    // Checkbox marcado (true/1/"true") DENTRO desta coorte
     const reunioesAgendadas = leadsDaCoorte.filter((lead: any) => {
-      // Verifica booleano true, string "true" ou "1"
-      return lead.reuniao_agendada === true || String(lead.reuniao_agendada) === 'true' || lead.reuniao_agendada === 1;
+      const val = lead.reuniao_agendada;
+      return val === true || val === 'true' || val === 1;
     }).length;
 
+    // Negócios ganhos DENTRO desta coorte
     const negociosFechados = leadsDaCoorte.filter((lead: any) => {
       const status = String(lead.status || '').toLowerCase();
       return status.includes('ganho') || status.includes('fechado') || status.includes('contrato');
     }).length;
 
+    // Valor monetário DENTRO desta coorte
     const valorTotalNegocios = leadsDaCoorte
       .filter((lead: any) => {
         const status = String(lead.status || '').toLowerCase();
         return status.includes('ganho') || status.includes('fechado') || status.includes('contrato');
       })
       .reduce((sum: number, lead: any) => {
-        // Limpa formatação de moeda (R$ 1.000,00 -> 1000.00) se necessário
-        let valor = lead.valor_da_proposta;
-        if (typeof valor === 'string') {
-            valor = parseFloat(valor.replace('R$', '').replace('.', '').replace(',', '.').trim());
+        let v = lead.valor_da_proposta;
+        if (typeof v === 'string') {
+            // Limpa R$, pontos de milhar e troca virgula decimal por ponto
+            v = parseFloat(v.replace(/[^\d,.-]/g, '').replace('.', '').replace(',', '.'));
         }
-        return sum + (Number(valor) || 0);
+        return sum + (Number(v) || 0);
       }, 0);
 
-    // Salvar no banco para cache/histórico
+    console.log(`[Jestor] KPI Final ${periodo}: Leads=${leadsAtendidos}, Reuniões=${reunioesAgendadas}`);
+
+    // Salvar Cache
     await supabaseClient.from('kpis_dashboard').upsert({
       equipe_id: profile.equipe_id,
       leads_atendidos: leadsAtendidos,
@@ -158,23 +127,14 @@ serve(async (req) => {
       negocios_fechados: negociosFechados,
       valor_total_negocios: valorTotalNegocios,
       periodo: periodo,
-    }, { onConflict: 'equipe_id,periodo', ignoreDuplicates: false });
+    }, { onConflict: 'equipe_id,periodo' });
 
     return new Response(JSON.stringify({
-      leadsAtendidos, 
-      reunioesAgendadas, 
-      negociosFechados, 
-      valorTotalNegocios,
-      taxaConversaoReuniao: leadsAtendidos > 0 ? ((reunioesAgendadas / leadsAtendidos) * 100).toFixed(1) : '0.0',
-      taxaConversaoNegocio: reunioesAgendadas > 0 ? ((negociosFechados / reunioesAgendadas) * 100).toFixed(1) : '0.0',
-      periodo
+      leadsAtendidos, reunioesAgendadas, negociosFechados, valorTotalNegocios, periodo
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
-  } catch (error) {
-    console.error('[Jestor] Erro:', error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-    );
+  } catch (error: any) {
+    console.error(error);
+    return new Response(JSON.stringify({ error: error.message }), { headers: corsHeaders, status: 500 });
   }
 });
