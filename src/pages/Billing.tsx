@@ -358,152 +358,166 @@ const Billing = () => {
               </CardContent>
             </Card>
 
-            {/* PLANOS */}
-            <div className="space-y-6 pt-6 border-t">
-              <div className="mb-6">
-                <h2 className="text-2xl font-bold">Escolha seu Plano</h2>
-                <p className="text-muted-foreground text-sm mt-1">Planos flexíveis para cada estágio do seu negócio</p>
+            {/* PLANOS - Tabela Comparativa Profissional */}
+            <div className="space-y-6 pt-8 border-t">
+              <div className="text-center mb-8">
+                <h2 className="text-3xl font-bold tracking-tight">Escolha seu Plano</h2>
+                <p className="text-muted-foreground mt-2">Planos flexíveis para cada estágio do seu negócio jurídico</p>
               </div>
               
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                
-                {/* SOLO STARTER */}
-                <Card className="border hover:shadow-md transition-shadow">
-                  <CardHeader className="text-center pb-2">
-                    <CardTitle className="text-lg">Solo Starter</CardTitle>
-                    <div className="mt-2">
-                      <span className="text-3xl font-bold">R$ 200</span>
-                      <span className="text-muted-foreground text-sm">/mês</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-2">Para profissionais autônomos iniciando com IA</p>
-                  </CardHeader>
-                  <CardContent className="pt-4">
-                    <div className="space-y-3 text-sm">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
-                        <span><strong>1.000</strong> Créditos AdvAI/mês</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
-                        <span><strong>3</strong> usuários inclusos</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
-                        <span>Setup completo do agente IA</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
-                        <span>Central de Atendimento</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
-                        <span>Suporte via WhatsApp</span>
-                      </div>
-                    </div>
-                    <Button variant="outline" className="w-full mt-6" onClick={() => initiatePlanUpgrade(1)}>
-                      Selecionar Starter
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                {/* SOLO SCALE */}
-                <Card className="border-2 border-primary relative shadow-lg">
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <Badge className="bg-primary text-primary-foreground">Mais Popular</Badge>
-                  </div>
-                  <CardHeader className="text-center pb-2 pt-6">
-                    <CardTitle className="text-lg">Solo Scale</CardTitle>
-                    <div className="mt-2">
-                      <span className="text-3xl font-bold text-primary">R$ 400</span>
-                      <span className="text-muted-foreground text-sm">/mês</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-2">Para equipes em crescimento acelerado</p>
-                  </CardHeader>
-                  <CardContent className="pt-4">
-                    <div className="space-y-3 text-sm">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
-                        <span><strong>3.000</strong> Créditos AdvAI/mês</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
-                        <span><strong>5</strong> usuários inclusos</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
-                        <span>Tudo do Starter +</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
-                        <span>Dashboard com KPIs</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
-                        <span>Pipeline Comercial (CRM)</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
-                        <span>Gestão de Billing</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
-                        <span>Suporte prioritário (SLA 4h)</span>
-                      </div>
-                    </div>
-                    <Button className="w-full mt-6" onClick={() => initiatePlanUpgrade(2)}>
-                      Selecionar Scale
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                {/* SOLO PRO */}
-                <Card className="border hover:shadow-md transition-shadow">
-                  <CardHeader className="text-center pb-2">
-                    <CardTitle className="text-lg">Solo Pro</CardTitle>
-                    <div className="mt-2">
-                      <span className="text-3xl font-bold">R$ 1.000</span>
-                      <span className="text-muted-foreground text-sm">/mês</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-2">Para operações de alto volume e enterprise</p>
-                  </CardHeader>
-                  <CardContent className="pt-4">
-                    <div className="space-y-3 text-sm">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
-                        <span><strong>10.000</strong> Créditos AdvAI/mês</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
-                        <span><strong>Ilimitado</strong> usuários</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
-                        <span>Tudo do Scale +</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
-                        <span>Consultoria mensal com especialista</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
-                        <span>Suporte Builder Mode prioritário</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
-                        <span>Integrações avançadas via API</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
-                        <span>SLA 99.5% uptime garantido</span>
-                      </div>
-                    </div>
-                    <Button variant="outline" className="w-full mt-6" onClick={() => initiatePlanUpgrade(3)}>
-                      Selecionar Pro
-                    </Button>
-                  </CardContent>
-                </Card>
-
-              </div>
+              <Card className="overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50 hover:bg-muted/50">
+                      <TableHead className="w-[280px] py-6 pl-6">
+                        <span className="text-base font-semibold text-foreground">Recursos</span>
+                      </TableHead>
+                      <TableHead className="text-center py-6 min-w-[180px]">
+                        <div className="space-y-1">
+                          <div className="text-base font-semibold text-foreground">Solo Starter</div>
+                          <div className="text-2xl font-bold text-foreground">R$ 200<span className="text-sm font-normal text-muted-foreground">/mês</span></div>
+                        </div>
+                      </TableHead>
+                      <TableHead className="text-center py-6 min-w-[180px] bg-primary/5 relative">
+                        <Badge className="absolute -top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-primary text-primary-foreground">
+                          Mais Popular
+                        </Badge>
+                        <div className="space-y-1">
+                          <div className="text-base font-semibold text-primary">Solo Scale</div>
+                          <div className="text-2xl font-bold text-primary">R$ 400<span className="text-sm font-normal text-muted-foreground">/mês</span></div>
+                        </div>
+                      </TableHead>
+                      <TableHead className="text-center py-6 min-w-[180px]">
+                        <div className="space-y-1">
+                          <div className="text-base font-semibold text-foreground">Solo Pro</div>
+                          <div className="text-2xl font-bold text-foreground">R$ 1.000<span className="text-sm font-normal text-muted-foreground">/mês</span></div>
+                        </div>
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {/* Créditos */}
+                    <TableRow>
+                      <TableCell className="font-medium pl-6">
+                        <div className="flex items-center gap-2">
+                          <Zap className="w-4 h-4 text-primary" />
+                          Créditos AdvAI por mês
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center font-semibold">1.000</TableCell>
+                      <TableCell className="text-center font-semibold bg-primary/5">3.000</TableCell>
+                      <TableCell className="text-center font-semibold">10.000</TableCell>
+                    </TableRow>
+                    
+                    {/* Usuários */}
+                    <TableRow>
+                      <TableCell className="font-medium pl-6">
+                        <div className="flex items-center gap-2">
+                          <Users className="w-4 h-4 text-primary" />
+                          Usuários inclusos
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">até 3</TableCell>
+                      <TableCell className="text-center bg-primary/5">até 5</TableCell>
+                      <TableCell className="text-center font-semibold text-primary">Ilimitado</TableCell>
+                    </TableRow>
+                    
+                    {/* Setup Agente */}
+                    <TableRow>
+                      <TableCell className="font-medium pl-6">Setup completo do Agente IA</TableCell>
+                      <TableCell className="text-center"><CheckCircle2 className="w-5 h-5 text-green-500 mx-auto" /></TableCell>
+                      <TableCell className="text-center bg-primary/5"><CheckCircle2 className="w-5 h-5 text-green-500 mx-auto" /></TableCell>
+                      <TableCell className="text-center"><CheckCircle2 className="w-5 h-5 text-green-500 mx-auto" /></TableCell>
+                    </TableRow>
+                    
+                    {/* Central de Atendimento */}
+                    <TableRow>
+                      <TableCell className="font-medium pl-6">Central de Atendimento (Chat IA)</TableCell>
+                      <TableCell className="text-center"><CheckCircle2 className="w-5 h-5 text-green-500 mx-auto" /></TableCell>
+                      <TableCell className="text-center bg-primary/5"><CheckCircle2 className="w-5 h-5 text-green-500 mx-auto" /></TableCell>
+                      <TableCell className="text-center"><CheckCircle2 className="w-5 h-5 text-green-500 mx-auto" /></TableCell>
+                    </TableRow>
+                    
+                    {/* Dashboard KPIs */}
+                    <TableRow>
+                      <TableCell className="font-medium pl-6">Dashboard com KPIs em tempo real</TableCell>
+                      <TableCell className="text-center text-muted-foreground">—</TableCell>
+                      <TableCell className="text-center bg-primary/5"><CheckCircle2 className="w-5 h-5 text-green-500 mx-auto" /></TableCell>
+                      <TableCell className="text-center"><CheckCircle2 className="w-5 h-5 text-green-500 mx-auto" /></TableCell>
+                    </TableRow>
+                    
+                    {/* Pipeline Comercial */}
+                    <TableRow>
+                      <TableCell className="font-medium pl-6">Pipeline Comercial (CRM integrado)</TableCell>
+                      <TableCell className="text-center text-muted-foreground">—</TableCell>
+                      <TableCell className="text-center bg-primary/5"><CheckCircle2 className="w-5 h-5 text-green-500 mx-auto" /></TableCell>
+                      <TableCell className="text-center"><CheckCircle2 className="w-5 h-5 text-green-500 mx-auto" /></TableCell>
+                    </TableRow>
+                    
+                    {/* Gestão de Billing */}
+                    <TableRow>
+                      <TableCell className="font-medium pl-6">Gestão de Billing & Créditos</TableCell>
+                      <TableCell className="text-center text-muted-foreground">—</TableCell>
+                      <TableCell className="text-center bg-primary/5"><CheckCircle2 className="w-5 h-5 text-green-500 mx-auto" /></TableCell>
+                      <TableCell className="text-center"><CheckCircle2 className="w-5 h-5 text-green-500 mx-auto" /></TableCell>
+                    </TableRow>
+                    
+                    {/* Consultoria */}
+                    <TableRow>
+                      <TableCell className="font-medium pl-6">Consultoria mensal com especialista</TableCell>
+                      <TableCell className="text-center text-muted-foreground">—</TableCell>
+                      <TableCell className="text-center bg-primary/5 text-muted-foreground">—</TableCell>
+                      <TableCell className="text-center"><CheckCircle2 className="w-5 h-5 text-green-500 mx-auto" /></TableCell>
+                    </TableRow>
+                    
+                    {/* API Integrações */}
+                    <TableRow>
+                      <TableCell className="font-medium pl-6">Integrações avançadas via API</TableCell>
+                      <TableCell className="text-center text-muted-foreground">—</TableCell>
+                      <TableCell className="text-center bg-primary/5 text-muted-foreground">—</TableCell>
+                      <TableCell className="text-center"><CheckCircle2 className="w-5 h-5 text-green-500 mx-auto" /></TableCell>
+                    </TableRow>
+                    
+                    {/* Suporte */}
+                    <TableRow>
+                      <TableCell className="font-medium pl-6">Nível de Suporte</TableCell>
+                      <TableCell className="text-center text-sm">WhatsApp</TableCell>
+                      <TableCell className="text-center bg-primary/5 text-sm font-medium">Prioritário (SLA 4h)</TableCell>
+                      <TableCell className="text-center text-sm font-semibold text-primary">Premium + SLA 99.5%</TableCell>
+                    </TableRow>
+                    
+                    {/* Builder Mode */}
+                    <TableRow>
+                      <TableCell className="font-medium pl-6">Suporte Builder Mode</TableCell>
+                      <TableCell className="text-center text-muted-foreground">—</TableCell>
+                      <TableCell className="text-center bg-primary/5">Incluso</TableCell>
+                      <TableCell className="text-center font-medium text-primary">Prioritário</TableCell>
+                    </TableRow>
+                    
+                    {/* Botões de Ação */}
+                    <TableRow className="bg-muted/30 hover:bg-muted/30">
+                      <TableCell className="pl-6 py-6">
+                        <span className="text-sm text-muted-foreground">Selecione o plano ideal para você</span>
+                      </TableCell>
+                      <TableCell className="text-center py-6">
+                        <Button variant="outline" onClick={() => initiatePlanUpgrade(1)} className="w-full max-w-[140px]">
+                          Selecionar
+                        </Button>
+                      </TableCell>
+                      <TableCell className="text-center py-6 bg-primary/5">
+                        <Button onClick={() => initiatePlanUpgrade(2)} className="w-full max-w-[140px]">
+                          Selecionar
+                        </Button>
+                      </TableCell>
+                      <TableCell className="text-center py-6">
+                        <Button variant="outline" onClick={() => initiatePlanUpgrade(3)} className="w-full max-w-[140px]">
+                          Selecionar
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </Card>
             </div>
           </TabsContent>
 
