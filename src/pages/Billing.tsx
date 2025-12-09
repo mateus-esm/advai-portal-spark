@@ -359,44 +359,165 @@ const Billing = () => {
             </Card>
 
             {/* PLANOS LISTA */}
-            <div className="space-y-4 pt-4 border-t">
-              <h2 className="text-2xl font-bold">Mudar de Plano</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="space-y-6 pt-6 border-t">
+              <div className="text-center mb-8">
+                <h2 className="text-3xl font-bold mb-2">Escolha seu Plano</h2>
+                <p className="text-muted-foreground">Escale seu atendimento com inteligência artificial</p>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
                 
-                <Card className="border-border hover:border-primary transition-all">
-                  <CardHeader><CardTitle>Solo Starter</CardTitle><CardDescription>R$ 150/mês</CardDescription></CardHeader>
-                  <CardContent className="space-y-4">
-                    <ul className="space-y-2 text-sm text-muted-foreground">
-                      <li className="flex gap-2"><CheckCircle2 className="w-4 h-4 text-primary"/> 1.000 Créditos</li>
-                      <li className="flex gap-2"><CheckCircle2 className="w-4 h-4 text-primary"/> Até 3 Usuários</li>
-                      <li className="flex gap-2"><CheckCircle2 className="w-4 h-4 text-primary"/> Setup do Agente</li>
-                    </ul>
-                    <Button variant="outline" className="w-full mt-4" onClick={() => initiatePlanUpgrade(1)}>Assinar Starter</Button>
+                {/* SOLO STARTER */}
+                <Card className="relative border-border hover:border-primary/50 transition-all duration-300 flex flex-col">
+                  <CardHeader className="pb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Zap className="w-5 h-5 text-primary" />
+                      <CardTitle className="text-xl">Solo Starter</CardTitle>
+                    </div>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-4xl font-bold">R$ 150</span>
+                      <span className="text-muted-foreground">/mês</span>
+                    </div>
+                    <CardDescription className="mt-3 text-sm">
+                      Ideal para profissionais autônomos e pequenos escritórios que desejam começar a automatizar seu atendimento.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex-1 flex flex-col">
+                    <div className="space-y-3 flex-1">
+                      <p className="text-sm font-semibold text-foreground mb-3">O que está incluso:</p>
+                      <ul className="space-y-3 text-sm">
+                        <li className="flex items-start gap-3">
+                          <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                          <span><strong>1.000 Créditos AdvAI</strong> mensais para conversas inteligentes</span>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                          <span><strong>Até 3 usuários</strong> simultâneos na plataforma</span>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                          <span><strong>Setup completo</strong> do agente de IA personalizado</span>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                          <span><strong>Central de Atendimento</strong> com histórico de conversas</span>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                          <span><strong>Suporte via WhatsApp</strong> em horário comercial</span>
+                        </li>
+                      </ul>
+                    </div>
+                    <Button variant="outline" className="w-full mt-6" onClick={() => initiatePlanUpgrade(1)}>
+                      Começar com Starter
+                    </Button>
                   </CardContent>
                 </Card>
 
-                <Card className="border-primary border-2 shadow-lg transform scale-105 z-10">
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2"><Badge className="bg-primary text-white">Mais Popular</Badge></div>
-                  <CardHeader><CardTitle>Solo Scale</CardTitle><CardDescription>R$ 400/mês</CardDescription></CardHeader>
-                  <CardContent className="space-y-4">
-                    <ul className="space-y-2 text-sm text-muted-foreground">
-                      <li className="flex gap-2"><CheckCircle2 className="w-4 h-4 text-primary"/> 3.000 Créditos</li>
-                      <li className="flex gap-2"><CheckCircle2 className="w-4 h-4 text-primary"/> Até 5 Usuários</li>
-                      <li className="flex gap-2"><CheckCircle2 className="w-4 h-4 text-primary"/> Dashboard Completo</li>
-                    </ul>
-                    <Button className="w-full mt-4" onClick={() => initiatePlanUpgrade(2)}>Assinar Scale</Button>
+                {/* SOLO SCALE - MAIS POPULAR */}
+                <Card className="relative border-primary border-2 shadow-xl shadow-primary/10 flex flex-col">
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+                    <Badge className="bg-gradient-to-r from-primary to-orange-500 text-white px-4 py-1 text-sm font-semibold shadow-lg">
+                      Mais Popular
+                    </Badge>
+                  </div>
+                  <CardHeader className="pb-4 pt-8">
+                    <div className="flex items-center gap-2 mb-2">
+                      <TrendingUp className="w-5 h-5 text-primary" />
+                      <CardTitle className="text-xl">Solo Scale</CardTitle>
+                    </div>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-4xl font-bold text-primary">R$ 400</span>
+                      <span className="text-muted-foreground">/mês</span>
+                    </div>
+                    <CardDescription className="mt-3 text-sm">
+                      Para equipes em crescimento que precisam de mais capacidade e recursos avançados de gestão.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex-1 flex flex-col">
+                    <div className="space-y-3 flex-1">
+                      <p className="text-sm font-semibold text-foreground mb-3">Tudo do Starter, mais:</p>
+                      <ul className="space-y-3 text-sm">
+                        <li className="flex items-start gap-3">
+                          <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                          <span><strong>3.000 Créditos AdvAI</strong> mensais (3x mais capacidade)</span>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                          <span><strong>Até 5 usuários</strong> com gestão de permissões</span>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                          <span><strong>Dashboard completo</strong> com KPIs e métricas em tempo real</span>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                          <span><strong>Pipeline Comercial</strong> integrado (CRM visual)</span>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                          <span><strong>Gestão de Billing</strong> com histórico de consumo</span>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                          <span><strong>Suporte prioritário</strong> com SLA de 4 horas</span>
+                        </li>
+                      </ul>
+                    </div>
+                    <Button className="w-full mt-6 bg-primary hover:bg-primary/90" onClick={() => initiatePlanUpgrade(2)}>
+                      Escalar com Scale
+                    </Button>
                   </CardContent>
                 </Card>
 
-                <Card className="border-border hover:border-primary transition-all">
-                  <CardHeader><CardTitle>Solo Pro</CardTitle><CardDescription>R$ 1.000/mês</CardDescription></CardHeader>
-                  <CardContent className="space-y-4">
-                    <ul className="space-y-2 text-sm text-muted-foreground">
-                      <li className="flex gap-2"><CheckCircle2 className="w-4 h-4 text-primary"/> 10.000 Créditos</li>
-                      <li className="flex gap-2"><CheckCircle2 className="w-4 h-4 text-primary"/> Usuários Ilimitados</li>
-                      <li className="flex gap-2"><CheckCircle2 className="w-4 h-4 text-primary"/> Consultoria Dev</li>
-                    </ul>
-                    <Button variant="outline" className="w-full mt-4" onClick={() => initiatePlanUpgrade(3)}>Assinar Pro</Button>
+                {/* SOLO PRO */}
+                <Card className="relative border-border hover:border-primary/50 transition-all duration-300 flex flex-col bg-gradient-to-b from-background to-muted/20">
+                  <CardHeader className="pb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Users className="w-5 h-5 text-primary" />
+                      <CardTitle className="text-xl">Solo Pro</CardTitle>
+                    </div>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-4xl font-bold">R$ 1.000</span>
+                      <span className="text-muted-foreground">/mês</span>
+                    </div>
+                    <CardDescription className="mt-3 text-sm">
+                      Solução enterprise para operações de alto volume com suporte dedicado e consultoria estratégica.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex-1 flex flex-col">
+                    <div className="space-y-3 flex-1">
+                      <p className="text-sm font-semibold text-foreground mb-3">Tudo do Scale, mais:</p>
+                      <ul className="space-y-3 text-sm">
+                        <li className="flex items-start gap-3">
+                          <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                          <span><strong>10.000 Créditos AdvAI</strong> mensais (volume enterprise)</span>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                          <span><strong>Usuários ilimitados</strong> para toda sua equipe</span>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                          <span><strong>Consultoria mensal</strong> com especialista em IA</span>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                          <span><strong>Suporte Builder Mode</strong> prioritário para customizações</span>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                          <span><strong>Integrações avançadas</strong> via API dedicada</span>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <CheckCircle2 className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                          <span><strong>SLA garantido</strong> de 99.5% uptime</span>
+                        </li>
+                      </ul>
+                    </div>
+                    <Button variant="outline" className="w-full mt-6" onClick={() => initiatePlanUpgrade(3)}>
+                      Ir Pro
+                    </Button>
                   </CardContent>
                 </Card>
 
