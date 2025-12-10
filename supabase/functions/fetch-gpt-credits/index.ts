@@ -29,26 +29,17 @@ serve(async (req) => {
     const month = reqBody.month ? parseInt(reqBody.month) : now.getMonth() + 1;
     const periodo = `${year}-${month.toString().padStart(2, '0')}`;
 
-    // 1. Busca perfil e equipe
     const { data: profile } = await supabaseClient.from('profiles').select('equipe_id').eq('user_id', user.id).single();
     if (!profile) throw new Error('Profile not found');
 
-    // CORREÇÃO: Query ajustada para garantir o join correto
     const { data: equipe } = await supabaseClient
       .from('equipes')
-      .select(`
-        gpt_maker_agent_id, 
-        limite_creditos, 
-        creditos_avulsos, 
-        plano_id, 
-        planos ( limite_creditos )
-      `)
+      .select(`gpt_maker_agent_id, limite_creditos, creditos_avulsos, plano_id, planos ( limite_creditos )`)
       .eq('id', profile.equipe_id)
       .single();
 
     if (!equipe) throw new Error('Equipe não encontrada');
 
-    // 2. Busca consumo no GPT Maker
     let creditsSpent = 0;
     if (equipe.gpt_maker_agent_id) {
         const gptMakerToken = Deno.env.get('GPT_MAKER_API_TOKEN');
@@ -67,21 +58,17 @@ serve(async (req) => {
         }
     }
 
-    // CORREÇÃO LÓGICA DE LIMITE
-    // Se equipe.limite_creditos for nulo, pega do plano. Se plano for array (pode acontecer no join), pega o primeiro.
-    let limitePlano = 1000; // Default
+    let limit = 1000;
     if (equipe.limite_creditos) {
-        limitePlano = equipe.limite_creditos;
+        limit = equipe.limite_creditos;
     } else if (equipe.planos) {
-        // Supabase pode retornar objeto ou array dependendo da versão/config
         const p = Array.isArray(equipe.planos) ? equipe.planos[0] : equipe.planos;
-        if (p?.limite_creditos) limitePlano = p.limite_creditos;
+        if (p?.limite_creditos) limit = p.limite_creditos;
     }
 
-    const totalCredits = limitePlano + (equipe.creditos_avulsos || 0);
+    const totalCredits = limit + (equipe.creditos_avulsos || 0);
     const creditsBalance = totalCredits - creditsSpent;
 
-    // Atualiza histórico local
     await supabaseClient.from('consumo_creditos').upsert({
       equipe_id: profile.equipe_id, 
       creditos_utilizados: creditsSpent, 
@@ -92,7 +79,7 @@ serve(async (req) => {
       creditsSpent,
       creditsBalance,
       totalCredits,
-      planLimit: limitePlano,
+      planLimit: limit,
       extraCredits: equipe.creditos_avulsos,
       periodo
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
