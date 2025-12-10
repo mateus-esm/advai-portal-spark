@@ -9,210 +9,126 @@ const corsHeaders = {
 const ASAAS_API_URL = 'https://api.asaas.com/v3';
 
 serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
     const asaasApiKey = Deno.env.get('ASAAS_API_KEY');
-    if (!asaasApiKey) {
-      throw new Error('ASAAS_API_KEY not configured');
-    }
-
-    // Authenticate user
-    const supabaseClient = createClient(
+    
+    // Cliente Auth (para verificar quem está chamando)
+    const supabaseAuth = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
-        },
-      }
+      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     );
 
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-    if (authError || !user) {
-      throw new Error('Unauthorized');
-    }
+    // Cliente Admin (para inserir transação e atualizar cliente sem restrição RLS)
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
 
-    console.log('[Asaas Buy Credits] Authenticated user:', user.id);
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+    if (authError || !user) throw new Error('Unauthorized');
 
-    // Get request body
-    const { amount, paymentMethod, credits } = await req.json();
-    if (!amount || !paymentMethod || !credits) {
-      throw new Error('amount, paymentMethod and credits are required');
-    }
+    const { amount, paymentMethod, credits, creditCardToken } = await req.json();
 
-    console.log('[Asaas Buy Credits] Request:', { amount, paymentMethod, credits });
+    // Busca dados do perfil
+    const { data: profile } = await supabaseAuth.from('profiles').select('equipe_id, nome_completo, email, cpf').eq('user_id', user.id).single();
+    if (!profile?.cpf) throw new Error('CPF obrigatório no perfil.');
 
-    // Get user's profile and team
-    const { data: profile, error: profileError } = await supabaseClient
-      .from('profiles')
-      .select('equipe_id, nome_completo, email, cpf')
-      .eq('user_id', user.id)
-      .single();
+    const { data: equipe } = await supabaseAuth.from('equipes').select('id, nome_cliente, asaas_customer_id').eq('id', profile.equipe_id).single();
 
-    if (profileError || !profile) {
-      throw new Error('Profile not found');
-    }
-
-    // Validate CPF is present
-    if (!profile.cpf) {
-      throw new Error('CPF não cadastrado. Por favor, complete seu cadastro antes de realizar a compra.');
-    }
-
-    // Get team data
-    const { data: equipe, error: equipeError } = await supabaseClient
-      .from('equipes')
-      .select('id, nome_cliente, asaas_customer_id, creditos_avulsos')
-      .eq('id', profile.equipe_id)
-      .single();
-
-    if (equipeError || !equipe) {
-      throw new Error('Team not found');
-    }
-
+    // 1. Garantir Cliente no Asaas
     let asaasCustomerId = equipe.asaas_customer_id;
-
-    // Create customer in Asaas if not exists
     if (!asaasCustomerId) {
-      console.log('[Asaas Buy Credits] Creating customer in Asaas...');
-      
-      const customerResponse = await fetch(`${ASAAS_API_URL}/customers`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'access_token': asaasApiKey,
-        },
-        body: JSON.stringify({
-          name: equipe.nome_cliente,
-          email: profile.email,
-          cpfCnpj: profile.cpf,
-          notificationDisabled: false,
-        }),
-      });
-
-      if (!customerResponse.ok) {
-        const errorData = await customerResponse.text();
-        console.error('[Asaas Buy Credits] Error creating customer:', errorData);
-        throw new Error(`Failed to create customer: ${errorData}`);
-      }
-
-      const customerData = await customerResponse.json();
-      asaasCustomerId = customerData.id;
-
-      console.log('[Asaas Buy Credits] Customer created:', asaasCustomerId);
-
-      // Update team with customer ID
-      const { error: updateError } = await supabaseClient
-        .from('equipes')
-        .update({ asaas_customer_id: asaasCustomerId })
-        .eq('id', equipe.id);
-
-      if (updateError) {
-        console.error('[Asaas Buy Credits] Error updating team:', updateError);
-      }
-    } else {
-      // Customer already exists, update CPF if needed
-      console.log('[Asaas Buy Credits] Updating existing customer CPF...');
-      
-      const updateCustomerResponse = await fetch(`${ASAAS_API_URL}/customers/${asaasCustomerId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'access_token': asaasApiKey,
-        },
-        body: JSON.stringify({
-          cpfCnpj: profile.cpf,
-        }),
-      });
-
-      if (!updateCustomerResponse.ok) {
-        const errorData = await updateCustomerResponse.text();
-        console.error('[Asaas Buy Credits] Error updating customer CPF:', errorData);
-      } else {
-        console.log('[Asaas Buy Credits] Customer CPF updated successfully');
-      }
+       console.log('[Asaas Buy] Criando cliente no Asaas...');
+       const newCustomerRes = await fetch(`${ASAAS_API_URL}/customers`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'access_token': asaasApiKey },
+          body: JSON.stringify({ name: equipe.nome_cliente, email: profile.email, cpfCnpj: profile.cpf })
+       });
+       const newCustomer = await newCustomerRes.json();
+       if (newCustomer.id) {
+           asaasCustomerId = newCustomer.id;
+           // Salva o ID do cliente usando o admin client
+           await supabaseAdmin.from('equipes').update({ asaas_customer_id: asaasCustomerId }).eq('id', equipe.id);
+       } else {
+           throw new Error(`Falha ao criar cliente no Asaas: ${JSON.stringify(newCustomer)}`);
+       }
     }
 
-    // Create payment in Asaas
-    console.log('[Asaas Buy Credits] Creating payment...');
-    
+    // 2. CRIAR TRANSAÇÃO PENDENTE (CRÍTICO PARA O WEBHOOK)
+    // Usamos o Service Role Key para garantir a inserção
+    console.log('[Asaas Buy] Criando transação pendente...');
+    const { data: transacao, error: txError } = await supabaseAdmin
+      .from('transacoes')
+      .insert({
+        equipe_id: equipe.id,
+        tipo: 'compra_creditos',
+        valor: amount,
+        status: 'pendente',
+        descricao: `Compra de ${credits} créditos AdvAI`,
+        metadata: { creditos: credits } // O Webhook lerá isso para liberar os créditos
+      })
+      .select()
+      .single();
+
+    if (txError) throw new Error(`Erro ao criar registro de transação: ${txError.message}`);
+
+    // 3. CRIAR COBRANÇA NO ASAAS
     const billingType = paymentMethod === 'PIX' ? 'PIX' : 'CREDIT_CARD';
     const dueDate = new Date();
-    dueDate.setDate(dueDate.getDate() + 1); // Tomorrow
+    dueDate.setDate(dueDate.getDate() + 1); // Vence amanhã
 
-    const paymentResponse = await fetch(`${ASAAS_API_URL}/payments`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'access_token': asaasApiKey,
-      },
-      body: JSON.stringify({
-        customer: asaasCustomerId,
-        billingType: billingType,
-        value: amount,
-        dueDate: dueDate.toISOString().split('T')[0],
-        description: `Recarga de ${credits} créditos AdvAI`,
-        externalReference: `credits_${equipe.id}_${Date.now()}`,
-      }),
-    });
+    const paymentBody: any = {
+      customer: asaasCustomerId,
+      billingType: billingType,
+      value: amount,
+      dueDate: dueDate.toISOString().split('T')[0],
+      description: `Recarga de ${credits} créditos AdvAI`,
+      externalReference: `credits_${transacao.id}`, // <--- VÍNCULO IMPORTANTE
+    };
 
-    if (!paymentResponse.ok) {
-      const errorData = await paymentResponse.text();
-      console.error('[Asaas Buy Credits] Error creating payment:', errorData);
-      throw new Error(`Failed to create payment: ${errorData}`);
+    if (billingType === 'CREDIT_CARD' && creditCardToken) {
+        paymentBody.creditCardToken = creditCardToken;
     }
 
-    const paymentData = await paymentResponse.json();
-    console.log('[Asaas Buy Credits] Payment created:', paymentData.id);
+    console.log('[Asaas Buy] Enviando para Asaas...');
+    const paymentRes = await fetch(`${ASAAS_API_URL}/payments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'access_token': asaasApiKey },
+      body: JSON.stringify(paymentBody)
+    });
 
+    const paymentData = await paymentRes.json();
+
+    if (!paymentRes.ok) {
+        // Se falhar no Asaas, marca como falha no banco para não ficar pendente eternamente
+        await supabaseAdmin.from('transacoes').update({ status: 'falha' }).eq('id', transacao.id);
+        throw new Error(paymentData.errors?.[0]?.description || 'Erro no pagamento Asaas');
+    }
+
+    // Retorno para o Frontend
     const response: any = {
       success: true,
       paymentId: paymentData.id,
       invoiceUrl: paymentData.invoiceUrl,
+      transactionId: transacao.id
     };
 
-    // If PIX, get QR Code
-    if (paymentMethod === 'PIX' && paymentData.id) {
-      console.log('[Asaas Buy Credits] Fetching PIX QR Code...');
-      
-      const pixResponse = await fetch(`${ASAAS_API_URL}/payments/${paymentData.id}/pixQrCode`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'access_token': asaasApiKey,
-        },
-      });
-
-      if (pixResponse.ok) {
-        const pixData = await pixResponse.json();
-        response.pixQrCode = pixData.encodedImage; // Base64 image
-        response.pixCopyPaste = pixData.payload; // Copy & Paste code
-        console.log('[Asaas Buy Credits] PIX QR Code retrieved successfully');
-      } else {
-        console.error('[Asaas Buy Credits] Error fetching PIX QR Code');
-      }
+    if (billingType === 'PIX') {
+       const pixRes = await fetch(`${ASAAS_API_URL}/payments/${paymentData.id}/pixQrCode`, {
+         headers: { 'access_token': asaasApiKey }
+       });
+       const pixJson = await pixRes.json();
+       response.pixQrCode = pixJson.encodedImage;
+       response.pixCopyPaste = pixJson.payload;
     }
 
-    return new Response(
-      JSON.stringify(response),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      }
-    );
+    return new Response(JSON.stringify(response), { headers: corsHeaders });
 
-  } catch (error) {
-    console.error('[Asaas Buy Credits] Fatal Error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
-      }
-    );
+  } catch (error: any) {
+    console.error('[Asaas Buy Error]', error);
+    return new Response(JSON.stringify({ error: error.message }), { headers: corsHeaders, status: 500 });
   }
 });
