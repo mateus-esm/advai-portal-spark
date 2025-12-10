@@ -46,7 +46,7 @@ const Billing = () => {
   const [transacoes, setTransacoes] = useState<Transacao[]>([]);
   const [historicoConsumo, setHistoricoConsumo] = useState<HistoricoConsumo[]>([]);
   const [loading, setLoading] = useState(true);
-  const [processing, setProcessing] = useState<string | null>(null); // ID do plano ou 'credits' para loading individual
+  const [processing, setProcessing] = useState<string | null>(null); 
   const [selectedCredits, setSelectedCredits] = useState<number>(1000);
   
   // Filtros
@@ -57,7 +57,6 @@ const Billing = () => {
 
   const { toast } = useToast();
 
-  // Definição Rica dos Planos (Visual Premium)
   const planos = [
     {
       id: 1,
@@ -117,14 +116,12 @@ const Billing = () => {
       const m = month || filterMonth;
       const y = year || filterYear;
 
-      // 1. Buscar Créditos
       const { data: creds, error } = await supabase.functions.invoke('fetch-gpt-credits', {
         body: { month: m, year: y }
       });
       
       if (!error && creds) setCreditData(creds);
 
-      // 2. Buscar Dados da Equipe e Histórico
       if (user) {
         const { data: profile } = await supabase.from('profiles').select('equipe_id').eq('user_id', user.id).single();
         if (profile?.equipe_id) {
@@ -159,7 +156,7 @@ const Billing = () => {
     }
   };
 
-  // --- FUNÇÃO DE REDIRECIONAMENTO (Checkout Seguro) ---
+  // --- A MÁGICA ACONTECE AQUI: REDIRECIONAMENTO ---
   const handleRedirectPayment = async (type: 'credits' | 'plan', value: number) => {
     const loadingKey = type === 'plan' ? value.toString() : 'credits';
     setProcessing(loadingKey);
@@ -177,28 +174,26 @@ const Billing = () => {
         let func = '';
 
         if (type === 'credits') {
-            // R$ 40 a cada 500 créditos
             const amount = (value / 500) * 40; 
             body = { amount, credits: value };
             func = 'asaas-buy-credits';
         } else {
-            // Assinatura (value é o ID do plano)
             body = { plano_id: value };
             func = 'asaas-subscribe';
         }
 
         const { data, error } = await supabase.functions.invoke(func, { body });
 
+        // Validação robusta do link
         if (error || !data || !data.invoiceUrl) {
             throw new Error(data?.error || error?.message || "Erro ao gerar link de pagamento.");
         }
 
-        // REDIRECIONA PARA O ASAAS (Checkout Seguro)
+        // REDIRECIONAMENTO IMEDIATO
         window.location.href = data.invoiceUrl;
 
     } catch (error: any) {
         toast({ title: "Erro", description: error.message, variant: "destructive" });
-    } finally {
         setProcessing(null);
     }
   };
@@ -240,7 +235,7 @@ const Billing = () => {
         <TabsContent value="overview" className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 
-                {/* CARD DE SALDO DETALHADO */}
+                {/* CARD DE SALDO */}
                 <Card>
                     <CardHeader>
                         <div className="flex justify-between items-center">
@@ -319,7 +314,6 @@ const Billing = () => {
             </div>
         </TabsContent>
 
-        {/* PLANOS PREMIUM (RESTAURADO) */}
         <TabsContent value="plans">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {planos.map((p) => (
@@ -369,7 +363,7 @@ const Billing = () => {
                                 disabled={!!processing}
                             >
                                 {processing === p.id.toString() ? <Loader2 className="animate-spin mr-2 w-4 h-4"/> : null}
-                                {processing === p.id.toString() ? 'Processando...' : 'Assinar Agora'}
+                                {processing === p.id.toString() ? 'Redirecionando...' : 'Assinar Agora'}
                             </Button>
                         </CardFooter>
                     </Card>
@@ -377,7 +371,6 @@ const Billing = () => {
             </div>
         </TabsContent>
 
-        {/* HISTÓRICO */}
         <TabsContent value="history">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card>
