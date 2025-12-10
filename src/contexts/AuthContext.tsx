@@ -1,5 +1,5 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { type User, type Session } from "@supabase/supabase-js";
+import { createContext, useContext, useEffect, useState } from "react";
+import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Profile {
@@ -17,6 +17,7 @@ interface Equipe {
   crm_link: string;
   suporte_link: string;
   home_explanation?: string;
+  // Campos financeiros adicionados para tipagem correta
   subscription_status?: string;
   asaas_customer_id?: string;
 }
@@ -33,7 +34,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -88,7 +89,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // 2. Escutar mudanças de auth
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -119,8 +120,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setEquipe(null);
     setSession(null);
     setUser(null);
-    // Força recarregamento para limpar estados globais
-    window.location.href = "/login";
+    // REMOVIDO: window.location.href = "/login";
+    // O ProtectedRoute vai cuidar do redirecionamento
   };
 
   return (
