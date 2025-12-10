@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,8 +29,8 @@ interface Transacao {
   status: string;
   descricao: string;
   data_transacao: string;
-  data_pagamento?: string | null;
   invoice_url?: string;
+  data_pagamento?: string;
 }
 
 interface HistoricoConsumo {
@@ -39,7 +39,7 @@ interface HistoricoConsumo {
 }
 
 const Billing = () => {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth(); // Importa signOut
   const [creditData, setCreditData] = useState<CreditData | null>(null);
   const [statusAssinatura, setStatusAssinatura] = useState<string>('active');
   const [transacoes, setTransacoes] = useState<Transacao[]>([]);
@@ -118,6 +118,13 @@ const Billing = () => {
         body: { month: m, year: y }
       });
       
+      // AUTO-LOGOUT SE SESSÃO EXPIRADA
+      if (error && (error.code === 401 || error.message?.includes('Unauthorized'))) {
+          toast({ title: "Sessão Expirada", description: "Reconectando...", variant: "destructive" });
+          await signOut();
+          return;
+      }
+      
       if (!error && creds) setCreditData(creds);
 
       if (user) {
@@ -135,7 +142,7 @@ const Billing = () => {
       }
     } catch (e) {
       console.error(e);
-      toast({ variant: "destructive", title: "Erro", description: "Falha ao carregar dados financeiros." });
+      // Não exibe toast de erro genérico para evitar spam visual se for auth
     } finally {
       setLoading(false);
       setFilterLoading(false);
@@ -162,6 +169,7 @@ const Billing = () => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
             toast({ title: "Sessão expirada", description: "Faça login novamente.", variant: "destructive" });
+            await signOut();
             return;
         }
 
@@ -182,10 +190,9 @@ const Billing = () => {
         const { data, error } = await supabase.functions.invoke(func, { body });
 
         if (error || !data || !data.invoiceUrl) {
-            throw new Error(data?.error || error?.message || "Erro ao gerar link de pagamento.");
+            throw new Error(data?.error || error?.message || "Erro ao gerar link. Tente novamente.");
         }
 
-        // REDIRECIONA PARA O ASAAS
         window.location.href = data.invoiceUrl;
 
     } catch (error: any) {
@@ -231,7 +238,7 @@ const Billing = () => {
         <TabsContent value="overview" className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 
-                {/* CARD DE SALDO */}
+                {/* SALDO */}
                 <Card>
                     <CardHeader>
                         <div className="flex justify-between items-center">
@@ -282,7 +289,7 @@ const Billing = () => {
                     </CardContent>
                 </Card>
 
-                {/* CARD DE RECARGA */}
+                {/* RECARGA */}
                 <Card className="border-primary/20 bg-primary/5 flex flex-col justify-between">
                     <CardHeader>
                         <CardTitle>Recarga Avulsa</CardTitle>
