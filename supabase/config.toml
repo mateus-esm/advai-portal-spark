@@ -24,3 +24,6 @@ verify_jwt = true
 # NOVA CONFIGURAÇÃO ABAIXO:
 [functions.asaas-webhook]
 verify_jwt = false
+
+[functions.sync-asaas-ids]
+verify_jwt = false
