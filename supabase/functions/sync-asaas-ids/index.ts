@@ -13,6 +13,11 @@ serve(async (req) => {
 
   try {
     const asaasApiKey = Deno.env.get('ASAAS_API_KEY');
+    // CORREÇÃO: Validação explícita para o TypeScript
+    if (!asaasApiKey) {
+      throw new Error('ASAAS_API_KEY not configured');
+    }
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -23,7 +28,6 @@ serve(async (req) => {
 
     log("Iniciando sincronização Asaas -> Supabase...");
 
-    // 1. Buscar todos os clientes do Asaas
     log("Buscando clientes no Asaas...");
     const customersRes = await fetch(`${ASAAS_API_URL}/customers?limit=100`, {
       headers: { 'access_token': asaasApiKey }
@@ -35,37 +39,31 @@ serve(async (req) => {
     
     log(`${asaasCustomers.length} clientes encontrados no Asaas.`);
 
-    // 2. Para cada cliente Asaas, tentar achar no Supabase e atualizar
     for (const cus of asaasCustomers) {
-        // Tenta achar pelo email
         let { data: profile } = await supabaseClient
             .from('profiles')
             .select('equipe_id, email, cpf')
             .eq('email', cus.email)
             .maybeSingle();
 
-        // Se não achou por email, tenta por CPF (remove formatação)
         if (!profile && cus.cpfCnpj) {
             const cpfClean = cus.cpfCnpj.replace(/\D/g, '');
             const { data: profileCpf } = await supabaseClient
                 .from('profiles')
                 .select('equipe_id, email, cpf')
-                .eq('cpf', cpfClean) 
+                .eq('cpf', cpfClean)
                 .maybeSingle();
             profile = profileCpf;
         }
 
         if (profile && profile.equipe_id) {
-            // --- AQUI ESTÁ A ALTERAÇÃO: EXIBINDO O ID ---
-            log(`MATCH: ${cus.name} (${cus.email}) [ID ASAAS: ${cus.id}] -> Equipe ${profile.equipe_id}`);
+            log(`MATCH: ${cus.name} (${cus.email}) [ID: ${cus.id}] -> Equipe ${profile.equipe_id}`);
 
-            // Atualiza ID do Cliente
             await supabaseClient
                 .from('equipes')
                 .update({ asaas_customer_id: cus.id })
                 .eq('id', profile.equipe_id);
 
-            // 3. Buscar Assinatura Ativa deste cliente
             const subRes = await fetch(`${ASAAS_API_URL}/subscriptions?customer=${cus.id}&status=ACTIVE`, {
                 headers: { 'access_token': asaasApiKey }
             });
@@ -75,7 +73,6 @@ serve(async (req) => {
                 const sub = subData.data[0]; 
                 log(`  > Assinatura encontrada: ${sub.id} (Prox: ${sub.nextDueDate})`);
 
-                // Atualiza dados da assinatura
                 await supabaseClient
                     .from('equipes')
                     .update({ 
@@ -89,7 +86,7 @@ serve(async (req) => {
             }
 
         } else {
-            log(`SKIP: Cliente Asaas ${cus.name} (${cus.email}) [ID: ${cus.id}] não encontrado no Supabase.`);
+            log(`SKIP: Cliente Asaas ${cus.name} (${cus.email}) não encontrado no Supabase.`);
         }
     }
 
