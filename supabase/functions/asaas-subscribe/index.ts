@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.80.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,80 +13,88 @@ serve(async (req) => {
 
   try {
     const asaasApiKey = Deno.env.get('ASAAS_API_KEY');
+    if (!asaasApiKey) throw new Error('ASAAS_API_KEY not configured');
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     );
 
-    const { data: { user } } = await supabaseClient.auth.getUser();
-    if (!user) throw new Error('Unauthorized');
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    if (authError || !user) throw new Error('Unauthorized');
 
-    const { plano_id } = await req.json();
+    const { plano_id, creditCardToken } = await req.json();
+    if (!plano_id) throw new Error('plano_id is required');
 
-    // 1. Buscando Dados
-    const { data: profile } = await supabaseClient.from('profiles').select('equipe_id, email, cpf, nome_completo').eq('user_id', user.id).single();
-    const { data: equipe } = await supabaseClient.from('equipes').select('*').eq('id', profile.equipe_id).single();
+    const { data: profile } = await supabaseClient.from('profiles').select('equipe_id, nome_completo, email, cpf').eq('user_id', user.id).single();
+    if (!profile) throw new Error('Profile not found');
+    if (!profile.cpf) throw new Error('CPF necessário.');
+
+    const { data: equipe } = await supabaseClient.from('equipes').select('id, nome_cliente, asaas_customer_id').eq('id', profile.equipe_id).single();
+    if (!equipe) throw new Error('Team not found');
+
     const { data: plano } = await supabaseClient.from('planos').select('*').eq('id', plano_id).single();
+    if (!plano) throw new Error('Plan not found');
 
     let customerId = equipe.asaas_customer_id;
 
-    // 2. Garantir Cliente no Asaas
     if (!customerId) {
       const customerRes = await fetch(`${ASAAS_API_URL}/customers`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'access_token': asaasApiKey },
-        body: JSON.stringify({
-          name: equipe.nome_cliente,
-          email: profile.email,
-          cpfCnpj: profile.cpf
-        })
+        body: JSON.stringify({ name: equipe.nome_cliente, email: profile.email, cpfCnpj: profile.cpf })
       });
       const customerData = await customerRes.json();
-      customerId = customerData.id;
+      if (!customerData.id) throw new Error('Erro ao criar cliente Asaas');
       
-      // Atualiza equipe com ID do Asaas
-      await supabaseClient.from('equipes').update({ asaas_customer_id: customerId }).eq('id', equipe.id);
+      customerId = customerData.id;
+      const adminClient = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+      await adminClient.from('equipes').update({ asaas_customer_id: customerId }).eq('id', equipe.id);
     }
 
-    // 3. Calcular Próximo Dia 01
     const today = new Date();
     const nextDue = new Date(today.getFullYear(), today.getMonth() + 1, 1);
     const nextDueDate = nextDue.toISOString().split('T')[0];
 
-    // 4. Criar Assinatura
-    const subscriptionBody = {
+    const subBody: any = {
       customer: customerId,
-      billingType: 'UNDEFINED', // Cliente escolhe a forma de pagamento
+      billingType: creditCardToken ? 'CREDIT_CARD' : 'UNDEFINED',
       value: plano.preco_mensal,
       nextDueDate: nextDueDate,
       cycle: 'MONTHLY',
-      description: `Assinatura ${plano.nome} - AdvAI`,
-      externalReference: `sub_${equipe.id}` // Identificador para o Webhook
+      description: `Assinatura ${plano.nome}`,
+      externalReference: `sub_${equipe.id}_${plano.id}`
     };
+
+    if (creditCardToken) {
+        subBody.creditCardToken = creditCardToken;
+        subBody.remoteIp = req.headers.get('x-forwarded-for') || '0.0.0.0';
+    }
 
     const subRes = await fetch(`${ASAAS_API_URL}/subscriptions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'access_token': asaasApiKey },
-      body: JSON.stringify(subscriptionBody)
+      body: JSON.stringify(subBody)
     });
 
     const subData = await subRes.json();
+    if (!subRes.ok) throw new Error(subData.errors?.[0]?.description || 'Erro na assinatura');
 
-    if (!subRes.ok) throw new Error(`Erro Asaas: ${JSON.stringify(subData)}`);
-
-    // Atualiza status local
-    await supabaseClient.from('equipes').update({ 
-      asaas_subscription_id: subData.id,
-      subscription_status: 'pending_payment', // Pendente até pagar
-      plano_id: plano_id 
+    const adminClient = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    await adminClient.from('equipes').update({ 
+        asaas_subscription_id: subData.id,
+        subscription_status: 'active',
+        plano_id: plano_id
     }).eq('id', equipe.id);
 
     return new Response(JSON.stringify({ 
-      invoiceUrl: subData.invoiceUrl // URL para o cliente pagar
+      success: true, 
+      subscriptionId: subData.id,
+      invoiceUrl: subData.invoiceUrl 
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 });
+  } catch (error: any) {
+    return new Response(JSON.stringify({ error: error.message }), { headers: corsHeaders, status: 500 });
   }
 });
