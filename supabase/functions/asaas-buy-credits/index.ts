@@ -13,8 +13,6 @@ serve(async (req) => {
 
   try {
     const asaasApiKey = Deno.env.get('ASAAS_API_KEY');
-    if (!asaasApiKey) throw new Error('ASAAS_API_KEY not configured');
-
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -61,10 +59,10 @@ serve(async (req) => {
         metadata: { creditos: credits }
       }).select().single();
 
-    // 3. Cobrança UNDEFINED (Gera Link)
+    // 3. Cobrança (UNDEFINED permite escolha Pix/Cartão)
     const paymentBody = {
       customer: asaasCustomerId,
-      billingType: 'UNDEFINED', 
+      billingType: 'UNDEFINED',
       value: amount,
       dueDate: new Date(Date.now() + 2 * 86400000).toISOString().split('T')[0],
       description: `Recarga de ${credits} créditos AdvAI`,
@@ -79,7 +77,6 @@ serve(async (req) => {
 
     const paymentData = await paymentRes.json();
     
-    // VALIDACAO DO LINK
     if (!paymentData.invoiceUrl) {
         throw new Error("Erro Asaas: " + (paymentData.errors?.[0]?.description || "Link não gerado"));
     }
