@@ -50,13 +50,14 @@ serve(async (req) => {
             const { data: profileCpf } = await supabaseClient
                 .from('profiles')
                 .select('equipe_id, email, cpf')
-                .eq('cpf', cpfClean) // Assume que no banco está limpo ou formatado igual
+                .eq('cpf', cpfClean) 
                 .maybeSingle();
             profile = profileCpf;
         }
 
         if (profile && profile.equipe_id) {
-            log(`MATCH: ${cus.name} (${cus.email}) -> Equipe ${profile.equipe_id}`);
+            // --- AQUI ESTÁ A ALTERAÇÃO: EXIBINDO O ID ---
+            log(`MATCH: ${cus.name} (${cus.email}) [ID ASAAS: ${cus.id}] -> Equipe ${profile.equipe_id}`);
 
             // Atualiza ID do Cliente
             await supabaseClient
@@ -71,7 +72,7 @@ serve(async (req) => {
             const subData = await subRes.json();
             
             if (subData.data && subData.data.length > 0) {
-                const sub = subData.data[0]; // Pega a primeira ativa
+                const sub = subData.data[0]; 
                 log(`  > Assinatura encontrada: ${sub.id} (Prox: ${sub.nextDueDate})`);
 
                 // Atualiza dados da assinatura
@@ -88,7 +89,7 @@ serve(async (req) => {
             }
 
         } else {
-            log(`SKIP: Cliente Asaas ${cus.name} (${cus.email}) não encontrado no Supabase.`);
+            log(`SKIP: Cliente Asaas ${cus.name} (${cus.email}) [ID: ${cus.id}] não encontrado no Supabase.`);
         }
     }
 
