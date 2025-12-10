@@ -15,11 +15,17 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const authHeader = req.headers.get('Authorization')!;
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user } } = await supabaseClient.auth.getUser(token);
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
+    }
 
-    if (!user) throw new Error('Unauthorized');
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
+
+    if (authError || !user) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
+    }
 
     let reqBody: { year?: string; month?: string } = {};
     try { reqBody = await req.json(); } catch {}
@@ -29,17 +35,26 @@ serve(async (req) => {
     const month = reqBody.month ? parseInt(reqBody.month) : now.getMonth() + 1;
     const periodo = `${year}-${month.toString().padStart(2, '0')}`;
 
+    // Busca Perfil
     const { data: profile } = await supabaseClient.from('profiles').select('equipe_id').eq('user_id', user.id).single();
     if (!profile) throw new Error('Profile not found');
 
+    // Busca Equipe e Plano (Join Correto)
     const { data: equipe } = await supabaseClient
       .from('equipes')
-      .select(`gpt_maker_agent_id, limite_creditos, creditos_avulsos, plano_id, planos ( limite_creditos )`)
+      .select(`
+        gpt_maker_agent_id, 
+        limite_creditos, 
+        creditos_avulsos, 
+        plano_id, 
+        planos ( limite_creditos )
+      `)
       .eq('id', profile.equipe_id)
       .single();
 
     if (!equipe) throw new Error('Equipe não encontrada');
 
+    // Busca Consumo GPT Maker
     let creditsSpent = 0;
     if (equipe.gpt_maker_agent_id) {
         const gptMakerToken = Deno.env.get('GPT_MAKER_API_TOKEN');
@@ -54,10 +69,11 @@ serve(async (req) => {
                 creditsSpent = spentData.total || 0;
             }
         } catch (e) {
-            console.error("Erro GPT Maker API:", e);
+            console.error("Erro GPT API:", e);
         }
     }
 
+    // Calcula Limites
     let limit = 1000;
     if (equipe.limite_creditos) {
         limit = equipe.limite_creditos;
