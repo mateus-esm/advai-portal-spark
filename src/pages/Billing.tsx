@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,11 +9,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Zap, Loader2, CheckCircle2, AlertTriangle, ExternalLink, ShieldCheck, X, History, FileText } from "lucide-react";
+import { Zap, Loader2, CheckCircle2, AlertTriangle, ExternalLink, ShieldCheck, X, History, FileText, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 
-// Interfaces
 interface CreditData {
   creditsSpent: number;
   creditsBalance: number;
@@ -31,7 +30,6 @@ interface Transacao {
   descricao: string;
   data_transacao: string;
   invoice_url?: string;
-  data_pagamento?: string;
 }
 
 interface HistoricoConsumo {
@@ -46,10 +44,9 @@ const Billing = () => {
   const [transacoes, setTransacoes] = useState<Transacao[]>([]);
   const [historicoConsumo, setHistoricoConsumo] = useState<HistoricoConsumo[]>([]);
   const [loading, setLoading] = useState(true);
-  const [processing, setProcessing] = useState<string | null>(null); 
+  const [processing, setProcessing] = useState<string | null>(null);
   const [selectedCredits, setSelectedCredits] = useState<number>(1000);
   
-  // Filtros
   const currentDate = new Date();
   const [filterMonth, setFilterMonth] = useState<string>((currentDate.getMonth() + 1).toString());
   const [filterYear, setFilterYear] = useState<string>(currentDate.getFullYear().toString());
@@ -156,7 +153,6 @@ const Billing = () => {
     }
   };
 
-  // --- A MÁGICA ACONTECE AQUI: REDIRECIONAMENTO ---
   const handleRedirectPayment = async (type: 'credits' | 'plan', value: number) => {
     const loadingKey = type === 'plan' ? value.toString() : 'credits';
     setProcessing(loadingKey);
@@ -184,12 +180,11 @@ const Billing = () => {
 
         const { data, error } = await supabase.functions.invoke(func, { body });
 
-        // Validação robusta do link
         if (error || !data || !data.invoiceUrl) {
             throw new Error(data?.error || error?.message || "Erro ao gerar link de pagamento.");
         }
 
-        // REDIRECIONAMENTO IMEDIATO
+        // REDIRECIONA PARA O ASAAS
         window.location.href = data.invoiceUrl;
 
     } catch (error: any) {
