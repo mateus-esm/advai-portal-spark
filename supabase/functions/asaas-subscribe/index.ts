@@ -20,9 +20,7 @@ serve(async (req) => {
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) throw new Error('No authorization header');
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user } } = await supabaseClient.auth.getUser(token);
-    
+    const { data: { user } } = await supabaseClient.auth.getUser(authHeader.replace('Bearer ', ''));
     if (!user) throw new Error('Unauthorized');
 
     const { plano_id } = await req.json();
@@ -31,12 +29,10 @@ serve(async (req) => {
     const { data: equipe } = await supabaseClient.from('equipes').select('id, nome_cliente, asaas_customer_id').eq('id', profile.equipe_id).single();
     const { data: plano } = await supabaseClient.from('planos').select('*').eq('id', plano_id).single();
 
-    // 1. Garantir Cliente
     let customerId = equipe.asaas_customer_id;
     if (!customerId) {
         const searchRes = await fetch(`${ASAAS_API_URL}/customers?email=${profile.email}`, { headers: { 'access_token': asaasApiKey } });
         const searchData = await searchRes.json();
-        
         if (searchData.data?.length > 0) {
             customerId = searchData.data[0].id;
         } else {
@@ -45,14 +41,11 @@ serve(async (req) => {
                 headers: { 'Content-Type': 'application/json', 'access_token': asaasApiKey },
                 body: JSON.stringify({ name: equipe.nome_cliente, email: profile.email, cpfCnpj: profile.cpf })
             });
-            const newCus = await createRes.json();
-            if (!newCus.id) throw new Error("Erro ao criar cliente Asaas: " + JSON.stringify(newCus.errors));
-            customerId = newCus.id;
+            customerId = (await createRes.json()).id;
         }
         await supabaseClient.from('equipes').update({ asaas_customer_id: customerId }).eq('id', equipe.id);
     }
 
-    // 2. Criar Assinatura (UNDEFINED permite escolha Pix/Cartão)
     const subBody = {
         customer: customerId,
         billingType: 'UNDEFINED', 
@@ -72,25 +65,21 @@ serve(async (req) => {
     const subData = await subRes.json();
     if (!subData.id) throw new Error("Erro Asaas: " + JSON.stringify(subData.errors));
 
-    // 3. (CORREÇÃO) Buscar Link com Retry
+    // RETRY LOOP PARA PEGAR O LINK
     let invoiceUrl = null;
-    
-    // Tenta 5 vezes (5 segundos)
     for (let i = 0; i < 5; i++) {
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Espera 1s
-        
+        await new Promise(resolve => setTimeout(resolve, 1000));
         const paymentsRes = await fetch(`${ASAAS_API_URL}/subscriptions/${subData.id}/payments?limit=1`, {
             headers: { 'access_token': asaasApiKey }
         });
         const paymentsData = await paymentsRes.json();
-        
         if (paymentsData.data && paymentsData.data.length > 0) {
             invoiceUrl = paymentsData.data[0].invoiceUrl;
-            break; // Achou!
+            break;
         }
     }
 
-    if (!invoiceUrl) throw new Error("O Asaas demorou para gerar o link. Tente novamente em instantes.");
+    if (!invoiceUrl) throw new Error("O Asaas demorou para gerar o link. Tente novamente.");
 
     await supabaseClient.from('equipes').update({ 
         asaas_subscription_id: subData.id,
