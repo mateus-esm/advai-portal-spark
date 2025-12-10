@@ -13,8 +13,6 @@ serve(async (req) => {
 
   try {
     const asaasApiKey = Deno.env.get('ASAAS_API_KEY');
-    if (!asaasApiKey) throw new Error('ASAAS_API_KEY not configured');
-    
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -22,9 +20,7 @@ serve(async (req) => {
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) throw new Error('No authorization header');
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user } } = await supabaseClient.auth.getUser(token);
-    
+    const { data: { user } } = await supabaseClient.auth.getUser(authHeader.replace('Bearer ', ''));
     if (!user) throw new Error('Unauthorized');
 
     const { amount, credits } = await req.json();
@@ -35,14 +31,14 @@ serve(async (req) => {
     // 1. Garantir Cliente
     let asaasCustomerId = equipe.asaas_customer_id;
     if (!asaasCustomerId) {
-       const searchRes = await fetch(`${ASAAS_API_URL}/customers?email=${profile.email}`, { headers: { 'access_token': asaasApiKey! } });
+       const searchRes = await fetch(`${ASAAS_API_URL}/customers?email=${profile.email}`, { headers: { 'access_token': asaasApiKey } });
        const searchData = await searchRes.json();
        if (searchData.data?.length > 0) {
            asaasCustomerId = searchData.data[0].id;
        } else {
            const newRes = await fetch(`${ASAAS_API_URL}/customers`, {
               method: 'POST',
-               headers: { 'Content-Type': 'application/json', 'access_token': asaasApiKey! },
+              headers: { 'Content-Type': 'application/json', 'access_token': asaasApiKey },
               body: JSON.stringify({ name: equipe.nome_cliente, email: profile.email, cpfCnpj: profile.cpf })
            });
            const newCus = await newRes.json();
@@ -61,28 +57,26 @@ serve(async (req) => {
         metadata: { creditos: credits }
       }).select().single();
 
-    // 3. Cobrança (UNDEFINED para escolha do cliente)
+    // 3. Cobrança
     const paymentBody = {
       customer: asaasCustomerId,
-      billingType: 'UNDEFINED', 
+      billingType: 'UNDEFINED', // Permite Pix/Cartão
       value: amount,
-      dueDate: new Date(Date.now() + 2 * 86400000).toISOString().split('T')[0],
+      dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0],
       description: `Recarga de ${credits} créditos AdvAI`,
       externalReference: `credits_${transacao.id}`
     };
 
     const paymentRes = await fetch(`${ASAAS_API_URL}/payments`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'access_token': asaasApiKey! },
+      headers: { 'Content-Type': 'application/json', 'access_token': asaasApiKey },
       body: JSON.stringify(paymentBody)
     });
 
     const paymentData = await paymentRes.json();
-    if (!paymentRes.ok) throw new Error(paymentData.errors?.[0]?.description || 'Erro Asaas');
-
-    // IMPORTANTE: Garantir que invoiceUrl existe
+    
     if (!paymentData.invoiceUrl) {
-        throw new Error("Cobrança criada, mas URL de pagamento não retornada pelo Asaas.");
+        throw new Error("Erro Asaas: " + (paymentData.errors?.[0]?.description || "Link não gerado"));
     }
 
     await supabaseClient.from('transacoes').update({ invoice_url: paymentData.invoiceUrl }).eq('id', transacao.id);
