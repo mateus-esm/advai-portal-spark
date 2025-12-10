@@ -42,14 +42,49 @@ serve(async (req) => {
     // Helper para delay entre requests (evita 429)
     const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-    // --- 1. LOOP DE PAGINAÇÃO COM DELAY PARA EVITAR RATE LIMIT ---
+    // Função para fazer request com retry em caso de 429
+    const fetchWithRetry = async (body: any, retries = 3): Promise<any[]> => {
+        for (let attempt = 1; attempt <= retries; attempt++) {
+            const response = await fetch(jestorUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${equipe.jestor_api_token}`
+                },
+                body: JSON.stringify(body)
+            });
+
+            if (response.status === 429) {
+                console.log(`[Jestor Sync] Rate limit (429), aguardando ${attempt * 2}s...`);
+                await delay(attempt * 2000); // Backoff exponencial: 2s, 4s, 6s
+                continue;
+            }
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`[Jestor Sync] API Error: ${response.status} - ${errorText}`);
+                throw new Error(`Jestor API Error: ${response.status}`);
+            }
+            
+            const json = await response.json();
+            
+            if (Array.isArray(json.data)) return json.data;
+            if (json.data?.items && Array.isArray(json.data.items)) return json.data.items;
+            if (json.items && Array.isArray(json.items)) return json.items;
+            if (Array.isArray(json)) return json;
+            return [];
+        }
+        throw new Error('Jestor API: Máximo de tentativas excedido (429)');
+    };
+
+    // --- 1. LOOP DE PAGINAÇÃO COM DELAY E RETRY ---
     while (iterations < maxIterations) {
         iterations++;
         console.log(`[Jestor Sync] Batch ${iterations}, offset=${offset}...`);
         
-        // Delay entre requests para evitar 429 (500ms)
+        // Delay entre requests para evitar 429 (1.5s)
         if (iterations > 1) {
-            await delay(500);
+            await delay(1500);
         }
         
         const bodyJestor = {
@@ -61,33 +96,7 @@ serve(async (req) => {
             direction: 'asc'
         };
 
-        const response = await fetch(jestorUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${equipe.jestor_api_token}`
-            },
-            body: JSON.stringify(bodyJestor)
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`[Jestor Sync] API Error: ${response.status} - ${errorText}`);
-            throw new Error(`Jestor API Error: ${response.status}`);
-        }
-        
-        const json = await response.json();
-        let pageData: any[] = [];
-        
-        if (Array.isArray(json.data)) {
-            pageData = json.data;
-        } else if (json.data?.items && Array.isArray(json.data.items)) {
-            pageData = json.data.items;
-        } else if (json.items && Array.isArray(json.items)) {
-            pageData = json.items;
-        } else if (Array.isArray(json)) {
-            pageData = json;
-        }
+        const pageData = await fetchWithRetry(bodyJestor);
 
         console.log(`[Jestor Sync] Batch ${iterations}: ${pageData.length} registros`);
 
