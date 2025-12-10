@@ -30,23 +30,26 @@ serve(async (req) => {
     const { data: equipe } = await supabaseClient.from('equipes').select('jestor_api_token').eq('id', profile.equipe_id).single();
     if (!equipe?.jestor_api_token) throw new Error('Jestor API token not configured');
 
-    console.log('[Jestor Sync] Iniciando sincronização PAGINADA...');
+    console.log('[Jestor Sync] Iniciando sincronização com OFFSET...');
 
     const jestorUrl = 'https://mateussmaia.api.jestor.com/object/list';
     let allLeads: any[] = [];
-    let page = 1;
-    const limit = 100; // Limite seguro por página
+    let offset = 0;
+    const limit = 100; // Limite por batch
     let hasMore = true;
+    const maxIterations = 20; // Proteção: máximo 2000 leads
+    let iterations = 0;
 
-    // --- 1. LOOP DE PAGINAÇÃO (CRÍTICO PARA NÃO PERDER DADOS) ---
-    while (hasMore) {
-        console.log(`[Jestor Sync] Buscando página ${page}...`);
+    // --- 1. LOOP DE PAGINAÇÃO COM OFFSET (Jestor API pattern) ---
+    while (hasMore && iterations < maxIterations) {
+        iterations++;
+        console.log(`[Jestor Sync] Buscando batch ${iterations}, offset=${offset}...`);
         
         const bodyJestor = {
             object_type: 'o_apnte00i6bwtdfd2rjc',
             fields: ['id_jestor', 'criado_em', 'reuniao_agendada', 'status', 'valor_da_proposta'],
             limit: limit,
-            page: page,
+            offset: offset,
             sort: 'criado_em',
             direction: 'desc'
         };
@@ -60,19 +63,32 @@ serve(async (req) => {
             body: JSON.stringify(bodyJestor)
         });
 
-        if (!response.ok) throw new Error(`Jestor API Error: ${response.status}`);
+        if (!response.ok) {
+            console.error(`[Jestor Sync] API Error: ${response.status} - ${await response.text()}`);
+            throw new Error(`Jestor API Error: ${response.status}`);
+        }
         
         const json = await response.json();
-        let pageData = [];
+        let pageData: any[] = [];
         
-        if (Array.isArray(json.data)) pageData = json.data;
-        else if (json.data?.items) pageData = json.data.items;
+        // Jestor pode retornar data diretamente como array ou como {items: [...]}
+        if (Array.isArray(json.data)) {
+            pageData = json.data;
+        } else if (json.data?.items && Array.isArray(json.data.items)) {
+            pageData = json.data.items;
+        } else if (json.items && Array.isArray(json.items)) {
+            pageData = json.items;
+        }
+
+        console.log(`[Jestor Sync] Batch ${iterations} retornou ${pageData.length} registros`);
 
         if (pageData.length > 0) {
             allLeads = [...allLeads, ...pageData];
+            offset += pageData.length;
             // Se vier menos que o limite, chegamos ao fim
-            if (pageData.length < limit) hasMore = false;
-            else page++;
+            if (pageData.length < limit) {
+                hasMore = false;
+            }
         } else {
             hasMore = false;
         }
