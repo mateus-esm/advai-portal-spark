@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
-import { User, Session } from "@supabase/supabase-js";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { type User, type Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Profile {
@@ -17,6 +17,8 @@ interface Equipe {
   crm_link: string;
   suporte_link: string;
   home_explanation?: string;
+  subscription_status?: string;
+  asaas_customer_id?: string;
 }
 
 interface AuthContextType {
@@ -31,7 +33,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -39,54 +41,40 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = async (userId: string) => {
-    const { data: profileData, error: profileError } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("user_id", userId)
-      .single();
-
-    if (profileError) {
-      console.error("Erro ao buscar perfil:", profileError);
-      return;
-    }
-
-    setProfile(profileData);
-
-    if (profileData?.equipe_id) {
-      const { data: equipeData, error: equipeError } = await supabase
-        .from("equipes")
+    try {
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
         .select("*")
-        .eq("id", profileData.equipe_id)
+        .eq("user_id", userId)
         .single();
 
-      if (equipeError) {
-        console.error("Erro ao buscar equipe:", equipeError);
-      } else {
-        setEquipe(equipeData);
+      if (profileError) {
+        console.error("Erro ao buscar perfil:", profileError);
+        return;
       }
+
+      setProfile(profileData);
+
+      if (profileData?.equipe_id) {
+        const { data: equipeData, error: equipeError } = await supabase
+          .from("equipes")
+          .select("*")
+          .eq("id", profileData.equipe_id)
+          .single();
+
+        if (equipeError) {
+          console.error("Erro ao buscar equipe:", equipeError);
+        } else {
+          setEquipe(equipeData);
+        }
+      }
+    } catch (error) {
+      console.error("Erro no fetchProfile:", error);
     }
   };
 
   useEffect(() => {
-    // Setup auth listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          setTimeout(() => {
-            fetchProfile(session.user.id);
-          }, 0);
-        } else {
-          setProfile(null);
-          setEquipe(null);
-        }
-        setLoading(false);
-      }
-    );
-
-    // Check existing session
+    // 1. Verificar sessão inicial
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
@@ -97,6 +85,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setLoading(false);
       }
     });
+
+    // 2. Escutar mudanças de auth
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          fetchProfile(session.user.id);
+        } else {
+          setProfile(null);
+          setEquipe(null);
+          setLoading(false);
+        }
+      }
+    );
 
     return () => subscription.unsubscribe();
   }, []);
@@ -115,7 +119,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setEquipe(null);
     setSession(null);
     setUser(null);
-    // Force redirect to login
+    // Força recarregamento para limpar estados globais
     window.location.href = "/login";
   };
 
