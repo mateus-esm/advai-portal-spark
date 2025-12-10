@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Zap, Loader2, CheckCircle2, AlertTriangle, ExternalLink, ShieldCheck, X, History, FileText } from "lucide-react";
+import { Zap, Loader2, CheckCircle2, AlertTriangle, ExternalLink, ShieldCheck, X, History, FileText, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -31,7 +31,6 @@ interface Transacao {
   descricao: string;
   data_transacao: string;
   invoice_url?: string;
-  data_pagamento?: string;
 }
 
 interface HistoricoConsumo {
