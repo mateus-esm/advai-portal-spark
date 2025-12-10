@@ -8,7 +8,7 @@ import { Slider } from "@/components/ui/slider";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Zap, Loader2, CreditCard, History, CheckCircle2, AlertTriangle, ExternalLink } from "lucide-react";
+import { Zap, Loader2, CreditCard, History, CheckCircle2, AlertTriangle, ExternalLink, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 
