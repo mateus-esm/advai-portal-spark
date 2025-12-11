@@ -4,12 +4,12 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Content-Type': 'application/json', // Importante para o front entender o JSON
 };
 
 const ASAAS_API_URL = 'https://api.asaas.com/v3';
 
 serve(async (req) => {
-  // Handle CORS
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
@@ -19,23 +19,21 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // 1. Autenticação
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) throw new Error('Token não fornecido');
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(authHeader.replace('Bearer ', ''));
-    if (authError || !user) throw new Error('Sessão inválida');
+    if (!authHeader) throw new Error('No authorization header');
+    const { data: { user } } = await supabaseClient.auth.getUser(authHeader.replace('Bearer ', ''));
+    if (!user) throw new Error('Unauthorized');
 
     const { plano_id } = await req.json();
 
-    // 2. Buscar Dados
+    // 1. Buscar Dados
     const { data: profile } = await supabaseClient.from('profiles').select('equipe_id, email, cpf, nome_completo').eq('user_id', user.id).single();
     const { data: equipe } = await supabaseClient.from('equipes').select('id, nome_cliente, asaas_customer_id').eq('id', profile.equipe_id).single();
     const { data: plano } = await supabaseClient.from('planos').select('*').eq('id', plano_id).single();
 
-    // 3. Garantir Cliente no Asaas
+    // 2. Garantir Cliente Asaas
     let customerId = equipe.asaas_customer_id;
     if (!customerId) {
-        // Busca preventiva
         const searchRes = await fetch(`${ASAAS_API_URL}/customers?email=${profile.email}`, { headers: { 'access_token': asaasApiKey } });
         const searchData = await searchRes.json();
         
@@ -54,12 +52,12 @@ serve(async (req) => {
         await supabaseClient.from('equipes').update({ asaas_customer_id: customerId }).eq('id', equipe.id);
     }
 
-    // 4. Criar Assinatura
+    // 3. Criar Assinatura no Asaas
     const subBody = {
         customer: customerId,
-        billingType: 'UNDEFINED', 
+        billingType: 'UNDEFINED', // Permite escolha Pix/Cartão
         value: plano.preco_mensal,
-        nextDueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+        nextDueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0], // Amanhã
         cycle: 'MONTHLY',
         description: `Assinatura ${plano.nome}`,
         externalReference: `sub_${equipe.id}_${plano.id}`
@@ -72,15 +70,15 @@ serve(async (req) => {
     });
     
     const subData = await subRes.json();
-    if (!subData.id) throw new Error("Erro ao criar assinatura: " + JSON.stringify(subData.errors));
+    if (!subData.id) throw new Error("Erro Asaas: " + JSON.stringify(subData.errors));
 
-    // 5. LOOP DE PERSISTÊNCIA (30 Segundos)
-    // Aqui está a correção: insistimos até o link aparecer.
+    // 4. BUSCAR LINK DA COBRANÇA (LOOP DE 30 SEGUNDOS)
     let invoiceUrl = null;
+    let paymentId = null;
     
-    console.log(`Assinatura ${subData.id} criada. Aguardando cobrança...`);
+    console.log(`Assinatura ${subData.id} criada. Buscando cobrança...`);
 
-    for (let i = 0; i < 30; i++) { // 30 tentativas
+    for (let i = 0; i < 30; i++) { 
         await new Promise(resolve => setTimeout(resolve, 1000)); // Espera 1s
         
         const paymentsRes = await fetch(`${ASAAS_API_URL}/subscriptions/${subData.id}/payments?limit=1`, {
@@ -90,26 +88,37 @@ serve(async (req) => {
         
         if (paymentsData.data && paymentsData.data.length > 0) {
             invoiceUrl = paymentsData.data[0].invoiceUrl;
-            console.log(`Link encontrado na tentativa ${i+1}: ${invoiceUrl}`);
+            paymentId = paymentsData.data[0].id;
             break; 
         }
     }
 
-    if (!invoiceUrl) {
-        throw new Error("Timeout: O Asaas não gerou a cobrança a tempo. Verifique seu email.");
-    }
+    if (!invoiceUrl) throw new Error("O Asaas demorou para gerar o link. Tente novamente.");
 
-    // 6. Atualizar Banco
+    // 5. REGISTRAR TRANSAÇÃO NO HISTÓRICO (O QUE FALTAVA!)
+    await supabaseClient.from('transacoes').insert({
+        equipe_id: equipe.id,
+        tipo: 'assinatura',
+        valor: plano.preco_mensal,
+        status: 'pendente', // Fica pendente até o webhook confirmar
+        descricao: `Assinatura ${plano.nome}`,
+        invoice_url: invoiceUrl,
+        gateway_id: paymentId
+    });
+
+    // 6. Atualizar Status da Equipe
     await supabaseClient.from('equipes').update({ 
         asaas_subscription_id: subData.id,
         subscription_status: 'pending_payment',
         plano_id: plano_id 
     }).eq('id', equipe.id);
 
-    return new Response(JSON.stringify({ success: true, invoiceUrl }), { headers: corsHeaders });
+    return new Response(JSON.stringify({ 
+        success: true, 
+        invoiceUrl: invoiceUrl 
+    }), { headers: corsHeaders });
 
   } catch (error: any) {
-    console.error("Erro Fatal Subscribe:", error);
     return new Response(JSON.stringify({ error: error.message }), { headers: corsHeaders, status: 500 });
   }
 });
