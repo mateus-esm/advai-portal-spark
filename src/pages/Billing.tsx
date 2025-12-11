@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,33 +13,12 @@ import { Zap, Loader2, CheckCircle2, AlertTriangle, ExternalLink, ShieldCheck, X
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 
-// Interfaces
-interface CreditData {
-  creditsSpent: number;
-  creditsBalance: number;
-  totalCredits: number;
-  planLimit: number;
-  extraCredits: number;
-  periodo: string;
-}
-
-interface Transacao {
-  id: string;
-  tipo: string;
-  valor: number;
-  status: string;
-  descricao: string;
-  data_transacao: string;
-  invoice_url?: string;
-}
-
-interface HistoricoConsumo {
-  periodo: string;
-  creditos_utilizados: number;
-}
+interface CreditData { creditsSpent: number; creditsBalance: number; totalCredits: number; planLimit: number; extraCredits: number; periodo: string; }
+interface Transacao { id: string; tipo: string; valor: number; status: string; descricao: string; data_transacao: string; invoice_url?: string; }
+interface HistoricoConsumo { periodo: string; creditos_utilizados: number; }
 
 const Billing = () => {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const [creditData, setCreditData] = useState<CreditData | null>(null);
   const [statusAssinatura, setStatusAssinatura] = useState<string>('active');
   const [transacoes, setTransacoes] = useState<Transacao[]>([]);
@@ -56,56 +35,9 @@ const Billing = () => {
   const { toast } = useToast();
 
   const planos = [
-    {
-      id: 1,
-      name: "Solo Starter",
-      price: "200",
-      description: "Ideal para escritórios iniciando automação",
-      features: [
-        { text: "1.000 créditos AdvAI/mês", included: true },
-        { text: "Até 3 usuários", included: true },
-        { text: "Setup completo do Agente", included: true },
-        { text: "Central de Atendimento", included: true },
-        { text: "Suporte por email", included: true },
-        { text: "Pipeline Comercial (CRM)", included: false },
-        { text: "Dashboard de KPIs", included: false },
-        { text: "Consultoria dedicada", included: false },
-      ]
-    },
-    {
-      id: 2,
-      name: "Solo Scale",
-      price: "400",
-      description: "Para escritórios em crescimento acelerado",
-      popular: true,
-      features: [
-        { text: "3.000 créditos AdvAI/mês", included: true },
-        { text: "Até 5 usuários", included: true },
-        { text: "Setup completo do Agente", included: true },
-        { text: "Central de Atendimento", included: true },
-        { text: "Suporte prioritário", included: true },
-        { text: "Pipeline Comercial (CRM)", included: true },
-        { text: "Dashboard de KPIs", included: true },
-        { text: "Consultoria mensal inclusa", included: true },
-      ]
-    },
-    {
-      id: 3,
-      name: "Solo Pro",
-      price: "1.000",
-      description: "Solução enterprise para alta demanda",
-      badge: "Enterprise",
-      features: [
-        { text: "10.000 créditos AdvAI/mês", included: true },
-        { text: "Usuários ilimitados", included: true },
-        { text: "Setup completo do Agente", included: true },
-        { text: "Central de Atendimento", included: true },
-        { text: "Suporte 24/7 dedicado", included: true },
-        { text: "Pipeline Comercial (CRM)", included: true },
-        { text: "Dashboard de KPIs avançado", included: true },
-        { text: "Consultoria semanal", included: true },
-      ]
-    }
+    { id: 1, name: "Solo Starter", price: "200", description: "Ideal para iniciar", features: [{ text: "1.000 créditos", included: true }, { text: "3 Usuários", included: true }] },
+    { id: 2, name: "Solo Scale", price: "400", popular: true, description: "Mais vendido", features: [{ text: "3.000 créditos", included: true }, { text: "5 Usuários", included: true }] },
+    { id: 3, name: "Solo Pro", price: "1.000", badge: "Enterprise", description: "Alta demanda", features: [{ text: "10.000 créditos", included: true }, { text: "Ilimitado", included: true }] }
   ];
 
   const fetchCredits = async (month?: string, year?: string) => {
@@ -114,16 +46,7 @@ const Billing = () => {
       const m = month || filterMonth;
       const y = year || filterYear;
 
-      const { data: creds, error } = await supabase.functions.invoke('fetch-gpt-credits', {
-        body: { month: m, year: y }
-      });
-      
-      if (error && (error.code === 401 || error.message?.includes('Unauthorized'))) {
-          toast({ title: "Sessão Expirada", description: "Reconectando...", variant: "destructive" });
-          await signOut();
-          return;
-      }
-      
+      const { data: creds, error } = await supabase.functions.invoke('fetch-gpt-credits', { body: { month: m, year: y } });
       if (!error && creds) setCreditData(creds);
 
       if (user) {
@@ -150,16 +73,11 @@ const Billing = () => {
   useEffect(() => { if(user) fetchCredits(); }, [user]);
 
   const handleFilterChange = (type: 'month' | 'year', value: string) => {
-    if (type === 'month') {
-        setFilterMonth(value);
-        fetchCredits(value, filterYear);
-    } else {
-        setFilterYear(value);
-        fetchCredits(filterMonth, value);
-    }
+    if (type === 'month') { setFilterMonth(value); fetchCredits(value, filterYear); } 
+    else { setFilterYear(value); fetchCredits(filterMonth, value); }
   };
 
-  // --- NOVA FUNÇÃO DE REDIRECIONAMENTO COM FALLBACK ---
+  // --- LÓGICA DE REDIRECIONAMENTO COM TRATAMENTO DE ERRO MELHORADO ---
   const handleRedirectPayment = async (type: 'credits' | 'plan', value: number) => {
     const loadingKey = type === 'plan' ? value.toString() : 'credits';
     setProcessing(loadingKey);
@@ -168,11 +86,10 @@ const Billing = () => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) {
             toast({ title: "Sessão expirada", description: "Faça login novamente.", variant: "destructive" });
-            await signOut();
             return;
         }
 
-        toast({ title: "Processando...", description: "Gerando link seguro de pagamento..." });
+        toast({ title: "Aguarde...", description: "Estamos gerando seu link seguro junto ao banco..." });
 
         let body = {};
         let func = '';
@@ -186,46 +103,27 @@ const Billing = () => {
             func = 'asaas-subscribe';
         }
 
+        console.log(`Chamando função ${func}...`);
         const { data, error } = await supabase.functions.invoke(func, { body });
 
-        console.log('Resposta Asaas:', data, error);
+        console.log("Resposta do Backend:", data);
 
-        if (error || !data || !data.invoiceUrl) {
-            throw new Error(data?.error || error?.message || "Erro ao gerar link. Tente novamente.");
+        if (error) {
+            throw new Error(`Erro na API: ${error.message}`);
         }
 
-        // TENTA ABRIR EM NOVA ABA (Melhor para iframes)
-        const newWindow = window.open(data.invoiceUrl, '_blank');
-
-        // FALLBACK: Se o navegador bloqueou o popup
-        if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-            toast({
-                title: "Link de pagamento gerado!",
-                description: (
-                    <div className="flex flex-col gap-2 mt-2">
-                        <span>Clique abaixo para pagar:</span>
-                        <Button 
-                            size="sm" 
-                            variant="secondary"
-                            onClick={() => window.open(data.invoiceUrl, '_blank')}
-                            className="w-full flex items-center gap-2"
-                        >
-                            <ExternalLink className="w-4 h-4" /> Abrir Pagamento Seguro
-                        </Button>
-                    </div>
-                ),
-                duration: 15000, // Fica 15s na tela
-            });
-        } else {
-            toast({ 
-                title: "Sucesso!", 
-                description: "A página de pagamento foi aberta em uma nova aba.",
-                className: "bg-green-50 border-green-200"
-            });
+        if (!data || !data.invoiceUrl) {
+            // Se veio erro estruturado do backend
+            if (data?.error) throw new Error(data.error);
+            throw new Error("O link de pagamento não foi retornado pelo servidor.");
         }
+
+        // REDIRECIONA
+        window.location.href = data.invoiceUrl;
 
     } catch (error: any) {
-        toast({ title: "Erro", description: error.message, variant: "destructive" });
+        console.error("Erro no checkout:", error);
+        toast({ title: "Não foi possível gerar o pagamento", description: error.message, variant: "destructive" });
     } finally {
         setProcessing(null);
     }
@@ -237,111 +135,42 @@ const Billing = () => {
     <div className="flex-1 flex flex-col p-6 space-y-8">
       {/* Header */}
       <div className="flex justify-between items-center border-b pb-4">
-        <div>
-          <h1 className="text-3xl font-bold">Billing & Assinatura</h1>
-          <p className="text-muted-foreground">Gerencie seus pagamentos, planos e limites</p>
-        </div>
-        <div>
-           {statusAssinatura === 'active' ? (
-             <Badge className="bg-green-600 hover:bg-green-700 h-8 px-4 text-sm"><CheckCircle2 className="w-4 h-4 mr-2"/> Assinatura Ativa</Badge>
-           ) : (
-             <Badge variant="destructive" className="h-8 px-4 text-sm"><AlertTriangle className="w-4 h-4 mr-2"/> Pendente</Badge>
-           )}
-        </div>
+        <div><h1 className="text-3xl font-bold">Billing & Assinatura</h1><p className="text-muted-foreground">Gerencie seus pagamentos</p></div>
+        <Badge variant={statusAssinatura === 'active' ? 'default' : 'destructive'} className="h-8 px-4">{statusAssinatura === 'active' ? 'Regular' : 'Pendente'}</Badge>
       </div>
 
-      {statusAssinatura !== 'active' && (
-        <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4"/>
-            <AlertTitle>Pagamento Pendente</AlertTitle>
-            <AlertDescription>Sua assinatura não foi renovada. Regularize para evitar bloqueios.</AlertDescription>
-        </Alert>
-      )}
+      {statusAssinatura !== 'active' && <Alert variant="destructive"><AlertTriangle className="h-4 w-4"/><AlertTitle>Pagamento Pendente</AlertTitle><AlertDescription>Regularize sua assinatura.</AlertDescription></Alert>}
 
       <Tabs defaultValue="overview" className="space-y-6">
         <TabsList className="grid w-full grid-cols-3 max-w-[400px]">
-            <TabsTrigger value="overview">Visão Geral</TabsTrigger>
-            <TabsTrigger value="plans">Planos</TabsTrigger>
-            <TabsTrigger value="history">Histórico</TabsTrigger>
+            <TabsTrigger value="overview">Visão Geral</TabsTrigger><TabsTrigger value="plans">Planos</TabsTrigger><TabsTrigger value="history">Histórico</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-6">
+        <TabsContent value="overview">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                {/* SALDO */}
                 <Card>
                     <CardHeader>
-                        <div className="flex justify-between items-center">
-                            <CardTitle>Saldo de Créditos</CardTitle>
-                            {filterLoading && <Loader2 className="w-4 h-4 animate-spin text-primary"/>}
-                        </div>
+                        <div className="flex justify-between"><CardTitle>Saldo</CardTitle>{filterLoading && <Loader2 className="animate-spin w-4 h-4"/>}</div>
                         <div className="flex gap-2 mt-2">
-                            <Select value={filterMonth} onValueChange={(v) => handleFilterChange('month', v)} disabled={filterLoading}>
-                                <SelectTrigger className="w-[130px] h-8"><SelectValue placeholder="Mês" /></SelectTrigger>
-                                <SelectContent>
-                                    {Array.from({length: 12}, (_, i) => i + 1).map(m => (
-                                        <SelectItem key={m} value={m.toString()}>{new Date(0, m-1).toLocaleString('pt-BR', {month: 'long'})}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            <Select value={filterYear} onValueChange={(v) => handleFilterChange('year', v)} disabled={filterLoading}>
-                                <SelectTrigger className="w-[90px] h-8"><SelectValue placeholder="Ano" /></SelectTrigger>
-                                <SelectContent>
-                                    {[2024, 2025, 2026].map(y => <SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
+                            <Select value={filterMonth} onValueChange={(v) => handleFilterChange('month', v)}><SelectTrigger className="w-[120px]"><SelectValue/></SelectTrigger><SelectContent>{Array.from({length:12},(_,i)=>i+1).map(m=><SelectItem key={m} value={m.toString()}>{m}</SelectItem>)}</SelectContent></Select>
+                            <Select value={filterYear} onValueChange={(v) => handleFilterChange('year', v)}><SelectTrigger className="w-[90px]"><SelectValue/></SelectTrigger><SelectContent>{[2024,2025,2026].map(y=><SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}</SelectContent></Select>
                         </div>
                     </CardHeader>
                     <CardContent>
-                        <div className="flex items-end gap-2 mb-4">
-                            <span className={`text-4xl font-bold ${creditData?.creditsBalance && creditData.creditsBalance < 100 ? 'text-red-500' : 'text-primary'}`}>
-                                {creditData?.creditsBalance?.toLocaleString() || 0}
-                            </span>
-                            <span className="text-muted-foreground mb-1">disponíveis</span>
-                        </div>
-                        
-                        <Progress value={creditData?.totalCredits ? (creditData.creditsSpent / creditData.totalCredits) * 100 : 0} className="h-3 mb-6" />
-                        
-                        <div className="space-y-2 text-sm">
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">Limite do Plano:</span>
-                                <span className="font-medium">{creditData?.planLimit?.toLocaleString() || 0}</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">Créditos Avulsos:</span>
-                                <span className="font-medium text-green-600">+{creditData?.extraCredits?.toLocaleString() || 0}</span>
-                            </div>
-                            <div className="flex justify-between pt-2 border-t">
-                                <span className="text-muted-foreground">Consumo ({filterMonth}/{filterYear}):</span>
-                                <span className="font-medium text-red-500">-{creditData?.creditsSpent?.toLocaleString() || 0}</span>
-                            </div>
-                        </div>
+                        <div className="flex items-end gap-2 mb-4"><span className="text-4xl font-bold">{creditData?.creditsBalance?.toLocaleString() || 0}</span><span className="text-muted-foreground">/ {creditData?.totalCredits?.toLocaleString()}</span></div>
+                        <Progress value={creditData?.totalCredits ? (creditData.creditsSpent/creditData.totalCredits)*100 : 0} className="h-3 mb-4"/>
+                        <div className="space-y-1 text-sm"><div className="flex justify-between"><span>Plano:</span><span>{creditData?.planLimit}</span></div><div className="flex justify-between"><span>Avulso:</span><span>+{creditData?.extraCredits}</span></div><div className="flex justify-between text-red-500"><span>Usado:</span><span>-{creditData?.creditsSpent}</span></div></div>
                     </CardContent>
                 </Card>
-
-                {/* RECARGA */}
-                <Card className="border-primary/20 bg-primary/5 flex flex-col justify-between">
-                    <CardHeader>
-                        <CardTitle>Recarga Avulsa</CardTitle>
-                        <CardDescription>Precisa de mais? Adicione créditos instantâneos.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                        <div className="space-y-4">
-                            <div className="flex justify-between items-center">
-                                <span className="text-lg font-semibold">{selectedCredits.toLocaleString()} créditos</span>
-                                <span className="text-xl font-bold text-primary">R$ {((selectedCredits/500)*40).toFixed(2)}</span>
-                            </div>
-                            <Slider value={[selectedCredits]} onValueChange={(v) => setSelectedCredits(v[0])} min={500} max={5000} step={500} />
-                        </div>
-                        
-                        <Button className="w-full" size="lg" onClick={() => handleRedirectPayment('credits', selectedCredits)} disabled={processing === 'credits'}>
-                            {processing === 'credits' ? <Loader2 className="animate-spin mr-2"/> : <Zap className="w-4 h-4 mr-2"/>}
-                            Pagar com Pix ou Cartão
+                <Card className="bg-primary/5 border-primary/20">
+                    <CardHeader><CardTitle>Recarga</CardTitle><CardDescription>Adicione créditos</CardDescription></CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="flex justify-between font-bold"><span>{selectedCredits.toLocaleString()} créditos</span><span className="text-primary">R$ {((selectedCredits/500)*40).toFixed(2)}</span></div>
+                        <Slider value={[selectedCredits]} onValueChange={(v)=>setSelectedCredits(v[0])} min={500} max={5000} step={500}/>
+                        <Button className="w-full" onClick={() => handleRedirectPayment('credits', selectedCredits)} disabled={processing === 'credits'}>
+                            {processing === 'credits' ? <Loader2 className="animate-spin mr-2"/> : <Zap className="mr-2 h-4 w-4"/>} Pagar com Pix/Cartão
                         </Button>
-                        
-                        <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                            <ShieldCheck className="w-3 h-3"/> Checkout seguro via Asaas
-                        </div>
+                        <div className="flex justify-center text-xs text-muted-foreground gap-1"><ShieldCheck className="w-3 h-3"/> Checkout seguro Asaas</div>
                     </CardContent>
                 </Card>
             </div>
@@ -350,103 +179,20 @@ const Billing = () => {
         <TabsContent value="plans">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {planos.map((p) => (
-                    <Card key={p.id} className={`flex flex-col relative transition-all duration-200 ${p.popular ? 'border-primary shadow-xl scale-105 z-10' : 'hover:border-primary/50'}`}>
-                        {p.popular && (
-                            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-full shadow-sm">
-                                MAIS POPULAR
-                            </div>
-                        )}
-                        {p.badge && (
-                            <div className="absolute top-0 right-0 bg-secondary text-secondary-foreground text-xs font-bold px-2 py-1 rounded-bl">
-                                {p.badge}
-                            </div>
-                        )}
-                        
-                        <CardHeader>
-                            <CardTitle className="text-xl">{p.name}</CardTitle>
-                            <CardDescription>{p.description}</CardDescription>
-                            <div className="mt-4">
-                                <span className="text-3xl font-bold">R$ {p.price}</span>
-                                <span className="text-muted-foreground">/mês</span>
-                            </div>
-                        </CardHeader>
-                        
-                        <CardContent className="flex-1">
-                            <ul className="space-y-3">
-                                {p.features.map((feat, i) => (
-                                    <li key={i} className="flex items-start gap-2 text-sm">
-                                        {feat.included ? (
-                                            <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 shrink-0"/>
-                                        ) : (
-                                            <X className="w-4 h-4 text-muted-foreground/40 mt-0.5 shrink-0"/>
-                                        )}
-                                        <span className={feat.included ? "text-foreground" : "text-muted-foreground/60"}>
-                                            {feat.text}
-                                        </span>
-                                    </li>
-                                ))}
-                            </ul>
-                        </CardContent>
-                        
-                        <CardFooter>
-                            <Button 
-                                className="w-full" 
-                                variant={p.popular ? "default" : "outline"} 
-                                onClick={() => handleRedirectPayment('plan', p.id)} 
-                                disabled={!!processing}
-                            >
-                                {processing === p.id.toString() ? <Loader2 className="animate-spin mr-2 w-4 h-4"/> : null}
-                                {processing === p.id.toString() ? 'Processando...' : 'Assinar Agora'}
-                            </Button>
-                        </CardFooter>
+                    <Card key={p.id} className={`flex flex-col ${p.popular ? 'border-primary shadow-lg scale-105' : ''}`}>
+                        <CardHeader><CardTitle>{p.name}</CardTitle><div className="text-3xl font-bold mt-2">R$ {p.price}<span className="text-sm font-normal text-muted-foreground">/mês</span></div></CardHeader>
+                        <CardContent className="flex-1 space-y-2">{p.features.map((f,i)=><div key={i} className="flex gap-2 text-sm">{f.included?<CheckCircle2 className="w-4 h-4 text-green-500"/>:<X className="w-4 h-4 text-muted-foreground"/>}{f.text}</div>)}</CardContent>
+                        <CardFooter><Button className="w-full" variant={p.popular?"default":"outline"} onClick={()=>handleRedirectPayment('plan', p.id)} disabled={!!processing}>{processing===p.id.toString()?'Processando...':'Assinar Agora'}</Button></CardFooter>
                     </Card>
                 ))}
             </div>
         </TabsContent>
 
         <TabsContent value="history">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card>
-                    <CardHeader><CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5"/> Pagamentos Recentes</CardTitle></CardHeader>
-                    <CardContent className="p-0">
-                        <Table>
-                            <TableHeader><TableRow><TableHead>Data</TableHead><TableHead>Descrição</TableHead><TableHead>Valor</TableHead><TableHead>Status</TableHead><TableHead></TableHead></TableRow></TableHeader>
-                            <TableBody>
-                                {transacoes.map((t) => (
-                                    <TableRow key={t.id}>
-                                        <TableCell>{t.data_pagamento ? new Date(t.data_pagamento).toLocaleDateString() : new Date(t.data_transacao).toLocaleDateString()}</TableCell>
-                                        <TableCell className="max-w-[150px] truncate" title={t.descricao}>{t.descricao}</TableCell>
-                                        <TableCell>R$ {t.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</TableCell>
-                                        <TableCell><Badge variant={t.status === 'pago' ? 'default' : 'secondary'}>{t.status}</Badge></TableCell>
-                                        <TableCell>
-                                            {t.invoice_url && <a href={t.invoice_url} target="_blank" className="text-primary hover:underline flex items-center gap-1"><ExternalLink className="w-3 h-3"/></a>}
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                                {transacoes.length === 0 && <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Nenhuma transação encontrada.</TableCell></TableRow>}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader><CardTitle className="flex items-center gap-2"><History className="h-5 w-5"/> Histórico de Consumo</CardTitle></CardHeader>
-                    <CardContent className="p-0">
-                        <Table>
-                            <TableHeader><TableRow><TableHead>Mês/Ano</TableHead><TableHead className="text-right">Créditos Usados</TableHead></TableRow></TableHeader>
-                            <TableBody>
-                                {historicoConsumo.map((h) => (
-                                    <TableRow key={h.periodo}>
-                                        <TableCell className="font-medium">{h.periodo}</TableCell>
-                                        <TableCell className="text-right font-bold">{h.creditos_utilizados.toLocaleString()}</TableCell>
-                                    </TableRow>
-                                ))}
-                                {historicoConsumo.length === 0 && <TableRow><TableCell colSpan={2} className="text-center py-8 text-muted-foreground">Sem dados de consumo.</TableCell></TableRow>}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
-            </div>
+            <Card><CardHeader><CardTitle>Histórico</CardTitle></CardHeader><CardContent><Table><TableHeader><TableRow><TableHead>Data</TableHead><TableHead>Desc.</TableHead><TableHead>Valor</TableHead><TableHead>Status</TableHead><TableHead></TableHead></TableRow></TableHeader><TableBody>
+                {transacoes.map(t=>(<TableRow key={t.id}><TableCell>{new Date(t.data_transacao).toLocaleDateString()}</TableCell><TableCell>{t.descricao}</TableCell><TableCell>R$ {t.valor.toFixed(2)}</TableCell><TableCell><Badge variant={t.status==='pago'?'default':'secondary'}>{t.status}</Badge></TableCell><TableCell>{t.invoice_url && <a href={t.invoice_url} target="_blank" className="text-primary hover:underline flex items-center gap-1"><ExternalLink className="w-3 h-3"/>Fatura</a>}</TableCell></TableRow>))}
+                {transacoes.length===0 && <TableRow><TableCell colSpan={5} className="text-center py-4">Sem transações.</TableCell></TableRow>}
+            </TableBody></Table></CardContent></Card>
         </TabsContent>
       </Tabs>
     </div>
