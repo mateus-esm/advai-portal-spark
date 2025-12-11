@@ -13,19 +13,15 @@ serve(async (req) => {
 
   try {
     const asaasApiKey = Deno.env.get('ASAAS_API_KEY');
-    if (!asaasApiKey) throw new Error('ASAAS_API_KEY not configured');
-    
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) throw new Error('No authorization header');
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user } } = await supabaseClient.auth.getUser(token);
-    
-    if (!user) throw new Error('Unauthorized');
+    if (!authHeader) throw new Error('Token ausente');
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(authHeader.replace('Bearer ', ''));
+    if (userError || !user) throw new Error('Não autorizado');
 
     const { amount, credits } = await req.json();
 
@@ -51,7 +47,7 @@ serve(async (req) => {
        await supabaseClient.from('equipes').update({ asaas_customer_id: asaasCustomerId }).eq('id', equipe.id);
     }
 
-    // 2. Transação
+    // 2. Transação (Antes da cobrança)
     const { data: transacao } = await supabaseClient.from('transacoes').insert({
         equipe_id: equipe.id,
         tipo: 'compra_creditos',
@@ -61,7 +57,7 @@ serve(async (req) => {
         metadata: { creditos: credits }
       }).select().single();
 
-    // 3. Cobrança (UNDEFINED permite escolha Pix/Cartão)
+    // 3. Gerar Cobrança
     const paymentBody = {
       customer: asaasCustomerId,
       billingType: 'UNDEFINED',
@@ -79,12 +75,17 @@ serve(async (req) => {
 
     const paymentData = await paymentRes.json();
     
-    if (!paymentData.invoiceUrl) {
-        throw new Error("Erro Asaas: " + (paymentData.errors?.[0]?.description || "Link não gerado"));
+    if (!paymentData.invoiceUrl) throw new Error("Erro Asaas: Link não retornado.");
+
+    // 4. Atualizar Transação (Sem bloquear o retorno se falhar)
+    try {
+        await supabaseClient.from('transacoes').update({ invoice_url: paymentData.invoiceUrl }).eq('id', transacao.id);
+    } catch (e) {
+        console.error("Erro ao salvar invoice_url no banco:", e);
+        // Não lançamos erro aqui para não impedir o cliente de receber o link
     }
 
-    await supabaseClient.from('transacoes').update({ invoice_url: paymentData.invoiceUrl }).eq('id', transacao.id);
-
+    // 5. Retorno Garantido
     return new Response(JSON.stringify({ 
         success: true, 
         invoiceUrl: paymentData.invoiceUrl 
