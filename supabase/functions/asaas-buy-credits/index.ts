@@ -4,6 +4,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Content-Type': 'application/json',
 };
 
 const ASAAS_API_URL = 'https://api.asaas.com/v3';
@@ -19,9 +20,10 @@ serve(async (req) => {
     );
 
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) throw new Error('Token ausente');
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(authHeader.replace('Bearer ', ''));
-    if (userError || !user) throw new Error('Não autorizado');
+    if (!authHeader) throw new Error('No authorization header');
+    const { data: { user } } = await supabaseClient.auth.getUser(authHeader.replace('Bearer ', ''));
+    
+    if (!user) throw new Error('Unauthorized');
 
     const { amount, credits } = await req.json();
 
@@ -47,7 +49,7 @@ serve(async (req) => {
        await supabaseClient.from('equipes').update({ asaas_customer_id: asaasCustomerId }).eq('id', equipe.id);
     }
 
-    // 2. Transação (Antes da cobrança)
+    // 2. Transação
     const { data: transacao } = await supabaseClient.from('transacoes').insert({
         equipe_id: equipe.id,
         tipo: 'compra_creditos',
@@ -57,7 +59,7 @@ serve(async (req) => {
         metadata: { creditos: credits }
       }).select().single();
 
-    // 3. Gerar Cobrança
+    // 3. Cobrança
     const paymentBody = {
       customer: asaasCustomerId,
       billingType: 'UNDEFINED',
@@ -75,17 +77,12 @@ serve(async (req) => {
 
     const paymentData = await paymentRes.json();
     
-    if (!paymentData.invoiceUrl) throw new Error("Erro Asaas: Link não retornado.");
-
-    // 4. Atualizar Transação (Sem bloquear o retorno se falhar)
-    try {
-        await supabaseClient.from('transacoes').update({ invoice_url: paymentData.invoiceUrl }).eq('id', transacao.id);
-    } catch (e) {
-        console.error("Erro ao salvar invoice_url no banco:", e);
-        // Não lançamos erro aqui para não impedir o cliente de receber o link
+    if (!paymentData.invoiceUrl) {
+        throw new Error("Erro Asaas: Link não gerado. " + JSON.stringify(paymentData.errors));
     }
 
-    // 5. Retorno Garantido
+    await supabaseClient.from('transacoes').update({ invoice_url: paymentData.invoiceUrl }).eq('id', transacao.id);
+
     return new Response(JSON.stringify({ 
         success: true, 
         invoiceUrl: paymentData.invoiceUrl 
